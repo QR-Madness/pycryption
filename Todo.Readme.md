@@ -63,7 +63,8 @@
 - [x] Create `AlgorithmContext` dataclass for injected state
 - [x] Create `AlgorithmResult` wrapper with metrics
 - [x] Add `quick_test()` and `benchmark()` utilities
-- [ ] Add `@with_chacha20` decorator for ChaCha20-Poly1305
+- [x] Add `@with_chacha20` decorator for ChaCha20-Poly1305
+- [x] Add `ComposerSession` class for algorithm management & benchmarking
 - [ ] Add layer context fields for multi-composer integration
 - [ ] Add `@with_compression` decorator for pre-encrypt compression
 - [ ] Add visualization helpers for benchmark results (matplotlib/pandas)

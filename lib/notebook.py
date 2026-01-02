@@ -110,6 +110,7 @@ class AlgorithmContext:
 
     # Crypto primitives (populated by decorators)
     aesgcm: Any = None  # AESGCM instance if using @with_aead
+    chacha: Any = None  # ChaCha20Poly1305 instance if using @with_chacha20
     cipher: Any = None  # Generic cipher instance
 
     # Layer context (for multi-composer)
@@ -176,7 +177,7 @@ def algorithm(
 
     Usage:
         @algorithm("AES-256-GCM-Experiment")
-        class MyAlgorithm:
+        class MyAlgorithm(EncryptionAlgorithm):
             def encrypt(self, data: bytes, ctx: AlgorithmContext) -> bytes:
                 ...
 
@@ -414,6 +415,37 @@ def with_aead(nonce_size: int = 12) -> Callable[[Type[T]], Type[T]]:
     return decorator
 
 
+def with_chacha20(nonce_size: int = 12) -> Callable[[Type[T]], Type[T]]:
+    """
+    Decorator that pre-configures ChaCha20-Poly1305 and injects it into context.
+
+    Usage:
+        @algorithm("MyAlgo")
+        @with_key(generate_key(32))
+        @with_chacha20()
+        class MyAlgorithm:
+            def encrypt(self, data: bytes, ctx: AlgorithmContext) -> bytes:
+                return ctx.chacha.encrypt(ctx.nonce, data, None)
+
+            def decrypt(self, data: bytes, ctx: AlgorithmContext) -> bytes:
+                return ctx.chacha.decrypt(ctx.nonce, data, None)
+    """
+    from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
+
+    def decorator(cls: Type[T]) -> Type[T]:
+        config = _ensure_config(cls)
+        config.nonce_size = nonce_size
+
+        def inject_chacha(ctx: AlgorithmContext) -> None:
+            if ctx.key:
+                ctx.chacha = ChaCha20Poly1305(ctx.key)
+
+        config.context_modifiers.append(inject_chacha)
+        return cls
+
+    return decorator
+
+
 def with_metrics() -> Callable[[Type[T]], Type[T]]:
     """
     Decorator to enable detailed metrics collection.
@@ -478,6 +510,255 @@ def aes256gcm_algorithm(
         return cls
 
     return decorator
+
+
+# -----------------------------------------------------------------------------
+# Composer Session - Algorithm Manager & Benchmarker
+# -----------------------------------------------------------------------------
+
+
+@dataclass
+class AlgorithmMetrics:
+    """Aggregated metrics for a registered algorithm."""
+
+    name: str
+    encrypt_calls: int = 0
+    decrypt_calls: int = 0
+    total_encrypt_ms: float = 0.0
+    total_decrypt_ms: float = 0.0
+    total_bytes_processed: int = 0
+    errors: int = 0
+
+    @property
+    def avg_encrypt_ms(self) -> float:
+        return self.total_encrypt_ms / self.encrypt_calls if self.encrypt_calls > 0 else 0.0
+
+    @property
+    def avg_decrypt_ms(self) -> float:
+        return self.total_decrypt_ms / self.decrypt_calls if self.decrypt_calls > 0 else 0.0
+
+    def as_dict(self) -> Dict[str, Any]:
+        return {
+            "name": self.name,
+            "encrypt_calls": self.encrypt_calls,
+            "decrypt_calls": self.decrypt_calls,
+            "avg_encrypt_ms": round(self.avg_encrypt_ms, 3),
+            "avg_decrypt_ms": round(self.avg_decrypt_ms, 3),
+            "total_bytes_processed": self.total_bytes_processed,
+            "errors": self.errors,
+        }
+
+
+class ComposerSession:
+    """
+    Algorithm manager and benchmarker for notebook-style algorithms.
+
+    Acts as a lightweight composer that can register multiple algorithms,
+    run them through standardized tests, and compare their performance.
+
+    Usage:
+        session = ComposerSession()
+
+        # Register algorithms
+        session.register(MyAESAlgorithm())
+        session.register(MyChaChaAlgorithm())
+
+        # Run single algorithm
+        result = session.encrypt("AES-256-GCM", data)
+
+        # Benchmark all registered algorithms
+        session.benchmark_all()
+
+        # Compare algorithms
+        session.compare()
+    """
+
+    def __init__(self) -> None:
+        self._algorithms: Dict[str, Any] = {}
+        self._metrics: Dict[str, AlgorithmMetrics] = {}
+
+    def register(self, algo_instance: Any, name: Optional[str] = None) -> "ComposerSession":
+        """
+        Register an algorithm instance for management.
+
+        Args:
+            algo_instance: A decorated algorithm instance
+            name: Optional override name (defaults to algorithm's configured name)
+
+        Returns:
+            self for chaining
+        """
+        config = getattr(algo_instance, "_config", None)
+        algo_name = name or (config.name if config else algo_instance.__class__.__name__)
+
+        self._algorithms[algo_name] = algo_instance
+        self._metrics[algo_name] = AlgorithmMetrics(name=algo_name)
+        return self
+
+    def list_algorithms(self) -> list[str]:
+        """List all registered algorithm names."""
+        return list(self._algorithms.keys())
+
+    def get(self, name: str) -> Any:
+        """Get a registered algorithm by name."""
+        if name not in self._algorithms:
+            raise KeyError(f"Algorithm '{name}' not registered")
+        return self._algorithms[name]
+
+    def encrypt(self, name: str, data: bytes) -> AlgorithmResult:
+        """
+        Encrypt data using the named algorithm.
+
+        Args:
+            name: Registered algorithm name
+            data: Data to encrypt
+
+        Returns:
+            AlgorithmResult with output and metrics
+        """
+        algo = self.get(name)
+        metrics = self._metrics[name]
+
+        result = algo.encrypt(data)
+        metrics.encrypt_calls += 1
+
+        if result.success:
+            metrics.total_encrypt_ms += result.metrics.get("elapsed_ms", 0)
+            metrics.total_bytes_processed += len(data)
+        else:
+            metrics.errors += 1
+
+        return result
+
+    def decrypt(self, name: str, data: bytes, nonce: Optional[bytes] = None) -> AlgorithmResult:
+        """
+        Decrypt data using the named algorithm.
+
+        Args:
+            name: Registered algorithm name
+            data: Data to decrypt
+            nonce: Nonce/IV used during encryption
+
+        Returns:
+            AlgorithmResult with output and metrics
+        """
+        algo = self.get(name)
+        metrics = self._metrics[name]
+
+        result = algo.decrypt(data, nonce=nonce)
+        metrics.decrypt_calls += 1
+
+        if result.success:
+            metrics.total_decrypt_ms += result.metrics.get("elapsed_ms", 0)
+            metrics.total_bytes_processed += len(data)
+        else:
+            metrics.errors += 1
+
+        return result
+
+    def test(self, name: str, test_data: bytes = b"Hello, PyCryption!") -> bool:
+        """
+        Run a round-trip test on the named algorithm.
+
+        Returns:
+            True if round-trip successful, False otherwise
+        """
+        enc_result = self.encrypt(name, test_data)
+        if not enc_result.success:
+            return False
+
+        dec_result = self.decrypt(name, enc_result.output, nonce=enc_result.nonce)
+        if not dec_result.success:
+            return False
+
+        return dec_result.output == test_data
+
+    def test_all(self, test_data: bytes = b"Hello, PyCryption!") -> Dict[str, bool]:
+        """
+        Run round-trip tests on all registered algorithms.
+
+        Returns:
+            Dict mapping algorithm names to success status
+        """
+        return {name: self.test(name, test_data) for name in self._algorithms}
+
+    def benchmark(
+        self,
+        name: str,
+        data_sizes: Optional[list[int]] = None,
+        iterations: int = 10,
+    ) -> Dict[str, Any]:
+        """
+        Benchmark a specific algorithm.
+
+        Args:
+            name: Registered algorithm name
+            data_sizes: List of data sizes to test
+            iterations: Number of iterations per size
+
+        Returns:
+            Benchmark results dict
+        """
+        algo = self.get(name)
+        return benchmark(algo, data_sizes=data_sizes, iterations=iterations)
+
+    def benchmark_all(
+        self,
+        data_sizes: Optional[list[int]] = None,
+        iterations: int = 10,
+    ) -> Dict[str, Dict[str, Any]]:
+        """
+        Benchmark all registered algorithms.
+
+        Returns:
+            Dict mapping algorithm names to their benchmark results
+        """
+        return {
+            name: self.benchmark(name, data_sizes=data_sizes, iterations=iterations)
+            for name in self._algorithms
+        }
+
+    def compare(
+        self,
+        data_size: int = 10000,
+        iterations: int = 50,
+    ) -> list[Dict[str, Any]]:
+        """
+        Compare all registered algorithms at a specific data size.
+
+        Returns:
+            Sorted list of algorithm performance (fastest first)
+        """
+        results = []
+
+        for name in self._algorithms:
+            bench = self.benchmark(name, data_sizes=[data_size], iterations=iterations)
+            if bench["benchmarks"]:
+                entry = bench["benchmarks"][0]
+                results.append({
+                    "algorithm": name,
+                    "avg_encrypt_ms": entry["avg_encrypt_ms"],
+                    "avg_decrypt_ms": entry["avg_decrypt_ms"],
+                    "throughput_mbps": entry["throughput_mbps"],
+                })
+
+        # Sort by encrypt time (fastest first)
+        results.sort(key=lambda x: x["avg_encrypt_ms"])
+        return results
+
+    def report(self) -> Dict[str, Dict[str, Any]]:
+        """
+        Get aggregated metrics for all algorithms.
+
+        Returns:
+            Dict mapping algorithm names to their metrics
+        """
+        return {name: m.as_dict() for name, m in self._metrics.items()}
+
+    def reset_metrics(self) -> None:
+        """Reset all collected metrics."""
+        for name in self._metrics:
+            self._metrics[name] = AlgorithmMetrics(name=name)
 
 
 # -----------------------------------------------------------------------------
@@ -594,12 +875,16 @@ __all__ = [
     "with_password",
     "with_env_key",
     "with_aead",
+    "with_chacha20",
     "with_metrics",
     "aes256gcm_algorithm",
     # Config & Context types
     "AlgorithmConfig",
     "AlgorithmContext",
     "AlgorithmResult",
+    "AlgorithmMetrics",
+    # Composer session
+    "ComposerSession",
     # Key providers
     "KeyProvider",
     "LocalKeyProvider",
