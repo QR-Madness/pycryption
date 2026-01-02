@@ -30,7 +30,7 @@ from lib.EncryptionAlgorithm import (
     MultiEncryptionAlgorithmInput,
     MultiEncryptionAlgorithmOutput,
 )
-from lib.util.key_providers import KeyProvider, inject_key
+from lib.util.kms.providers import KeyProvider, inject_key
 
 
 # -----------------------------------------------------------------------------
@@ -214,7 +214,7 @@ def create_aes256gcm(key: bytes) -> Aes256GcmAlgorithm:
     Returns:
         Configured Aes256GcmAlgorithm instance
     """
-    from lib.util.key_providers import LocalKeyProvider
+    from lib.util.kms.providers import LocalKeyProvider
 
     algo = Aes256GcmAlgorithm()
     algo._key_provider = LocalKeyProvider(key)
@@ -237,7 +237,7 @@ def create_aes256gcm_from_password(
     Returns:
         Configured Aes256GcmAlgorithm instance
     """
-    from lib.util.key_providers import DerivedKeyProvider
+    from lib.util.kms.providers import DerivedKeyProvider
 
     algo = Aes256GcmAlgorithm()
     algo._key_provider = DerivedKeyProvider(

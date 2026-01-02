@@ -42,8 +42,8 @@ def wrap_aes256gcm(key: bytes, name: str = "AES-256-GCM") -> object:
             payload = Aes256GcmInput(plaintext=data)
             result = inner.encrypt(payload)
             # Store nonce in context for later retrieval
-            ctx.nonce = result.nonce
-            return result.ciphertext
+            ctx.nonce = getattr(result, "nonce")
+            return getattr(result, "ciphertext")
 
         def decrypt(self, data: bytes, ctx) -> bytes:
             payload = Aes256GcmOutput(
@@ -52,7 +52,7 @@ def wrap_aes256gcm(key: bytes, name: str = "AES-256-GCM") -> object:
                 metrics_report={},
             )
             result = inner.decrypt(payload)
-            return result.plaintext
+            return getattr(result, "plaintext")
 
     return WrappedAes256Gcm()
 

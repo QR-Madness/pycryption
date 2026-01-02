@@ -28,10 +28,7 @@ from lib.notebook.decorators import (
     with_key,
     with_password,
     with_env_key,
-    with_aead,
-    with_chacha20,
     with_metrics,
-    aes256gcm_algorithm,
 )
 
 # Composer
@@ -54,7 +51,7 @@ from lib.notebook.adapters import (
 )
 
 # Re-export key providers for convenience
-from lib.util.key_providers import (
+from lib.util.kms.providers import (
     KeyProvider,
     LocalKeyProvider,
     EnvKeyProvider,
@@ -79,10 +76,7 @@ __all__ = [
     "with_key",
     "with_password",
     "with_env_key",
-    "with_aead",
-    "with_chacha20",
     "with_metrics",
-    "aes256gcm_algorithm",
     # Composer
     "ComposerSession",
     "AlgorithmMetrics",

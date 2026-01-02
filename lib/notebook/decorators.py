@@ -12,7 +12,7 @@ from functools import wraps
 from typing import Any, Callable, Optional, Type, TypeVar, Union
 
 from lib.EncryptionAlgorithm import SIMPLE_COMPOSER_TYPE
-from lib.util.key_providers import (
+from lib.util.kms.providers import (
     KeyProvider,
     LocalKeyProvider,
     DerivedKeyProvider,
@@ -251,58 +251,6 @@ def with_env_key(env_var: str) -> Callable[[Type[T]], Type[T]]:
 # -----------------------------------------------------------------------------
 
 
-def with_aead(nonce_size: int = 12) -> Callable[[Type[T]], Type[T]]:
-    """
-    Pre-configure AESGCM primitive and inject into context.
-
-    Adds `ctx.aesgcm` (AESGCM instance) to the algorithm context.
-    Requires a key to be configured via @with_key or similar.
-
-    Args:
-        nonce_size: Nonce size in bytes (default 12)
-    """
-    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-
-    def decorator(cls: Type[T]) -> Type[T]:
-        config = _ensure_config(cls)
-        config.nonce_size = nonce_size
-
-        def inject_aesgcm(ctx: AlgorithmContext) -> None:
-            if ctx.key:
-                ctx.aesgcm = AESGCM(ctx.key)
-
-        config.context_modifiers.append(inject_aesgcm)
-        return cls
-
-    return decorator
-
-
-def with_chacha20(nonce_size: int = 12) -> Callable[[Type[T]], Type[T]]:
-    """
-    Pre-configure ChaCha20-Poly1305 primitive and inject into context.
-
-    Adds `ctx.chacha` (ChaCha20Poly1305 instance) to the algorithm context.
-    Requires a key to be configured via @with_key or similar.
-
-    Args:
-        nonce_size: Nonce size in bytes (default 12)
-    """
-    from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
-
-    def decorator(cls: Type[T]) -> Type[T]:
-        config = _ensure_config(cls)
-        config.nonce_size = nonce_size
-
-        def inject_chacha(ctx: AlgorithmContext) -> None:
-            if ctx.key:
-                ctx.chacha = ChaCha20Poly1305(ctx.key)
-
-        config.context_modifiers.append(inject_chacha)
-        return cls
-
-    return decorator
-
-
 def with_metrics() -> Callable[[Type[T]], Type[T]]:
     """
     Enable detailed metrics collection.
@@ -319,43 +267,6 @@ def with_metrics() -> Callable[[Type[T]], Type[T]]:
             ctx.metrics["timestamp"] = time.time()
 
         config.context_modifiers.append(add_detailed_metrics)
-        return cls
-
-    return decorator
-
-
-# -----------------------------------------------------------------------------
-# Convenience Factories
-# -----------------------------------------------------------------------------
-
-
-def aes256gcm_algorithm(
-    name: str = "AES-256-GCM",
-    key: Optional[bytes] = None,
-    password: Optional[str] = None,
-    salt: Optional[bytes] = None,
-) -> Callable[[Type[T]], Type[T]]:
-    """
-    All-in-one decorator combining @algorithm, @with_key/@with_password, and @with_aead.
-
-    Args:
-        name: Algorithm name
-        key: Raw key bytes (mutually exclusive with password)
-        password: Password for key derivation
-        salt: Salt for password derivation (required if password provided)
-    """
-
-    def decorator(cls: Type[T]) -> Type[T]:
-        cls = with_aead(nonce_size=12)(cls)
-
-        if password:
-            if salt is None:
-                raise ValueError("salt is required when using password")
-            cls = with_password(password, salt=salt)(cls)
-        elif key:
-            cls = with_key(key)(cls)
-
-        cls = algorithm(name)(cls)
         return cls
 
     return decorator

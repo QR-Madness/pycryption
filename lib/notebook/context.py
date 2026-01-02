@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
 
 from lib.EncryptionAlgorithm import SIMPLE_COMPOSER_TYPE
-from lib.util.key_providers import KeyProvider
+from lib.util.kms.providers import KeyProvider
 
 
 @dataclass

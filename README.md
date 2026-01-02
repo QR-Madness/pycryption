@@ -2,6 +2,8 @@
 
 An encryption research repository with specialized composers for demonstrating algorithms and production mechanisms while collecting benchmarks.
 
+> Architect's Note: This repo is an evolving early-prototype. It will lack and/or provide features preferred by cryptography professionals.
+
 ## Purpose
 
 This project reduces cognitive overhead when testing:
