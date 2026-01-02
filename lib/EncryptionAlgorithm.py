@@ -29,7 +29,6 @@ class SimpleEncryptionAlgorithmInput:
 
     _composer_type = "simple"
     _is_decrypted: bool
-    _hashed_key: bytes
 
     def __init__(self):
         pass

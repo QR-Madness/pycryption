@@ -12,11 +12,11 @@ Then define algorithms declaratively:
     @with_key(generate_key(32))
     @with_aead()
     class MyAlgorithm:
-        def encrypt(self, plaintext: bytes, ctx: AlgorithmContext) -> bytes:
-            return ctx.aesgcm.encrypt(ctx.nonce, plaintext, None)
+        def encrypt(self, data: bytes, ctx: AlgorithmContext) -> bytes:
+            return ctx.aesgcm.encrypt(ctx.nonce, data, None)
 
-        def decrypt(self, ciphertext: bytes, ctx: AlgorithmContext) -> bytes:
-            return ctx.aesgcm.decrypt(ctx.nonce, ciphertext, None)
+        def decrypt(self, data: bytes, ctx: AlgorithmContext) -> bytes:
+            return ctx.aesgcm.decrypt(ctx.nonce, data, None)
 
     # Use it immediately
     quick_test(MyAlgorithm())
@@ -177,7 +177,7 @@ def algorithm(
     Usage:
         @algorithm("AES-256-GCM-Experiment")
         class MyAlgorithm:
-            def encrypt(self, plaintext: bytes, ctx: AlgorithmContext) -> bytes:
+            def encrypt(self, data: bytes, ctx: AlgorithmContext) -> bytes:
                 ...
 
     The decorated class gains:
@@ -206,17 +206,17 @@ def algorithm(
 
         # Wrap encrypt method
         if hasattr(cls, "encrypt"):
-            original_encrypt = cls.encrypt
+            original_encrypt = getattr(cls, "encrypt")
 
             @wraps(original_encrypt)
-            def wrapped_encrypt(self: Any, plaintext: bytes, **kwargs: Any) -> AlgorithmResult:
+            def wrapped_encrypt(self: Any, data: bytes, **kwargs: Any) -> AlgorithmResult:
                 ctx = _build_context(self, "encrypt")
                 ctx.generate_nonce()
 
                 try:
-                    output = original_encrypt(self, plaintext, ctx, **kwargs)
+                    output = original_encrypt(self, data, ctx, **kwargs)
                     ctx.metrics["elapsed_ms"] = round(ctx.elapsed_ms(), 3)
-                    ctx.metrics["plaintext_bytes"] = len(plaintext)
+                    ctx.metrics["input_bytes"] = len(data)
                     ctx.metrics["output_bytes"] = len(output) if output else 0
 
                     return AlgorithmResult(
@@ -237,12 +237,12 @@ def algorithm(
 
         # Wrap decrypt method
         if hasattr(cls, "decrypt"):
-            original_decrypt = cls.decrypt
+            original_decrypt = getattr(cls, "decrypt")
 
             @wraps(original_decrypt)
             def wrapped_decrypt(
                 self: Any,
-                ciphertext: bytes,
+                data: bytes,
                 nonce: Optional[bytes] = None,
                 **kwargs: Any,
             ) -> AlgorithmResult:
@@ -251,9 +251,9 @@ def algorithm(
                     ctx.nonce = nonce
 
                 try:
-                    output = original_decrypt(self, ciphertext, ctx, **kwargs)
+                    output = original_decrypt(self, data, ctx, **kwargs)
                     ctx.metrics["elapsed_ms"] = round(ctx.elapsed_ms(), 3)
-                    ctx.metrics["ciphertext_bytes"] = len(ciphertext)
+                    ctx.metrics["input_bytes"] = len(data)
                     ctx.metrics["output_bytes"] = len(output) if output else 0
 
                     return AlgorithmResult(
@@ -395,8 +395,8 @@ def with_aead(nonce_size: int = 12) -> Callable[[Type[T]], Type[T]]:
         @with_key(key)
         @with_aead()
         class MyAlgorithm:
-            def encrypt(self, plaintext: bytes, ctx: AlgorithmContext) -> bytes:
-                return ctx.aesgcm.encrypt(ctx.nonce, plaintext, None)
+            def encrypt(self, data: bytes, ctx: AlgorithmContext) -> bytes:
+                return ctx.aesgcm.encrypt(ctx.nonce, data, None)
     """
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
@@ -456,11 +456,11 @@ def aes256gcm_algorithm(
     Usage:
         @aes256gcm_algorithm(key=my_key)
         class MyAlgorithm:
-            def encrypt(self, plaintext: bytes, ctx: AlgorithmContext) -> bytes:
-                return ctx.aesgcm.encrypt(ctx.nonce, plaintext, None)
+            def encrypt(self, data: bytes, ctx: AlgorithmContext) -> bytes:
+                return ctx.aesgcm.encrypt(ctx.nonce, data, None)
 
-            def decrypt(self, ciphertext: bytes, ctx: AlgorithmContext) -> bytes:
-                return ctx.aesgcm.decrypt(ctx.nonce, ciphertext, None)
+            def decrypt(self, data: bytes, ctx: AlgorithmContext) -> bytes:
+                return ctx.aesgcm.decrypt(ctx.nonce, data, None)
     """
 
     def decorator(cls: Type[T]) -> Type[T]:
