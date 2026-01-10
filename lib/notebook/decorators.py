@@ -12,17 +12,16 @@ from functools import wraps
 from typing import Any, Callable, Optional, Type, TypeVar, Union
 
 from lib.EncryptionAlgorithm import SIMPLE_COMPOSER_TYPE
+from lib.notebook.context import (
+    AlgorithmConfig,
+    AlgorithmContext,
+    AlgorithmResult, KDFFunction,
+)
 from lib.util.kms.providers import (
     KeyProvider,
     LocalKeyProvider,
     DerivedKeyProvider,
     EnvKeyProvider,
-)
-
-from lib.notebook.context import (
-    AlgorithmConfig,
-    AlgorithmContext,
-    AlgorithmResult,
 )
 
 T = TypeVar("T")
@@ -51,7 +50,6 @@ def _build_context(instance: Any, operation: str) -> AlgorithmContext:
 
     ctx = AlgorithmContext(
         start_time=time.perf_counter(),
-        nonce_size=config.nonce_size,
     )
     ctx.metrics["algorithm"] = config.name
     ctx.metrics["operation"] = operation
@@ -74,8 +72,8 @@ def _build_context(instance: Any, operation: str) -> AlgorithmContext:
 
 
 def algorithm(
-    name: str,
-    composer_type: str = SIMPLE_COMPOSER_TYPE,
+        name: str,
+        composer_type: str = SIMPLE_COMPOSER_TYPE,
 ) -> Callable[[Type[T]], Type[T]]:
     """
     Class decorator that transforms a class into a managed algorithm.
@@ -141,10 +139,10 @@ def algorithm(
 
             @wraps(original_decrypt)
             def wrapped_decrypt(
-                self: Any,
-                data: bytes,
-                nonce: Optional[bytes] = None,
-                **kwargs: Any,
+                    self: Any,
+                    data: bytes,
+                    nonce: Optional[bytes] = None,
+                    **kwargs: Any,
             ) -> AlgorithmResult:
                 ctx = _build_context(self, "decrypt")
                 if nonce:
@@ -202,10 +200,10 @@ def with_key(key: Union[bytes, KeyProvider]) -> Callable[[Type[T]], Type[T]]:
 
 
 def with_password(
-    password: str,
-    salt: bytes,
-    kdf: str = "pbkdf2",
-    iterations: int = 480000,
+        password: str,
+        salt: bytes,
+        kdf: str = "pbkdf2",
+        iterations: int = 480000,
 ) -> Callable[[Type[T]], Type[T]]:
     """
     Derive and inject a key from password using KDF.
@@ -243,6 +241,45 @@ def with_env_key(env_var: str) -> Callable[[Type[T]], Type[T]]:
         config.key_provider = EnvKeyProvider(env_var)
         return cls
 
+    return decorator
+
+
+def with_kdf(name: str, func: KDFFunction) -> Callable[[Type[T]], Type[T]]:
+    """Register a KDF function by name, bound to algorithm context."""
+
+    def decorator(cls: Type[T]) -> Type[T]:
+        config = _ensure_config(cls)
+
+        def register_kdf(ctx: AlgorithmContext) -> None:
+            ctx.registry.register_kdf(name, func)
+
+        config.context_modifiers.append(register_kdf)
+        return cls
+
+    return decorator
+
+
+def with_salt(name: str, salt: Optional[bytes] = None, size: int = 16) -> Callable[[Type[T]], Type[T]]:
+    """Register a named salt, persisted on the instance."""
+    def decorator(cls: Type[T]) -> Type[T]:
+        config = _ensure_config(cls)
+        original_init = cls.__init__ if hasattr(cls, '__init__') else None
+
+        def new_init(self, *args, **kwargs):
+            if original_init:
+                original_init(self, *args, **kwargs)
+            if not hasattr(self, '_salts'):
+                self._salts = {}
+            if name not in self._salts:
+                self._salts[name] = salt if salt is not None else os.urandom(size)
+
+        cls.__init__ = new_init
+
+        def register_salt(ctx: AlgorithmContext, instance) -> None:
+            ctx.registry.register_salt(name, instance._salts.get(name), size)
+
+        config.context_modifiers.append(register_salt)
+        return cls
     return decorator
 
 

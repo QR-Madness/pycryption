@@ -9,10 +9,23 @@ from __future__ import annotations
 import os
 import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Callable
 
 from lib.EncryptionAlgorithm import SIMPLE_COMPOSER_TYPE
 from lib.util.kms.providers import KeyProvider
+
+KDFFunction = Callable[[bytes, bytes], bytes]  # (key, salt) -> derived_key
+
+
+@dataclass
+class LayerMaterial:
+    """"
+    Single layer's cryptographic materials.
+    """
+    key: Optional[bytes] = None
+    salt: Optional[bytes] = None
+    nonce: Optional[bytes] = None
+    derived_key: Optional[bytes] = None
 
 
 @dataclass
@@ -27,7 +40,6 @@ class AlgorithmConfig:
     name: str = "Unnamed"
     composer_type: str = SIMPLE_COMPOSER_TYPE
     key_provider: Optional[KeyProvider] = None
-    nonce_size: int = 12
     collect_metrics: bool = False
     context_modifiers: list = field(default_factory=list)
 
@@ -37,10 +49,39 @@ class AlgorithmConfig:
             name=self.name,
             composer_type=self.composer_type,
             key_provider=self.key_provider,
-            nonce_size=self.nonce_size,
             collect_metrics=self.collect_metrics,
             context_modifiers=list(self.context_modifiers),
         )
+
+
+@dataclass
+class ContextRegistry:
+    """Central registry for KDFs and layer materials, keyed by string names."""
+
+    kdfs: Dict[str, KDFFunction] = field(default_factory=dict)
+    layers: Dict[str, LayerMaterial] = field(default_factory=dict)
+    salts: Dict[str, bytes] = field(default_factory=dict)
+
+    def register_kdf(self, name: str, func: KDFFunction) -> None:
+        self.kdfs[name] = func
+
+    def register_salt(self, name: str, salt: Optional[bytes] = None, size: int = 16) -> bytes:
+        if salt is None:
+            salt = os.urandom(size)
+        self.salts[name] = salt
+        return salt
+
+    def get_layer(self, name: str) -> LayerMaterial:
+        if name not in self.layers:
+            self.layers[name] = LayerMaterial()
+        return self.layers[name]
+
+    def derive_key(self, kdf_name: str, key: bytes, salt_name: str) -> bytes:
+        if kdf_name not in self.kdfs:
+            raise KeyError(f"KDF '{kdf_name}' not registered")
+        if salt_name not in self.salts:
+            raise KeyError(f"Salt '{salt_name}' not registered")
+        return self.kdfs[kdf_name](key, self.salts[salt_name])
 
 
 @dataclass
@@ -52,7 +93,7 @@ class AlgorithmContext:
     crypto primitives configured by decorators.
     """
 
-    # Key material
+    # Primary Key material
     key: bytes = field(default=b"")
     key_id: Optional[str] = None
 
@@ -64,15 +105,12 @@ class AlgorithmContext:
     start_time: float = field(default=0.0)
     metrics: Dict[str, Any] = field(default_factory=dict)
 
-    # Crypto primitives (populated by decorators)
-    aesgcm: Any = None
-    chacha: Any = None
-    cipher: Any = None
+    registry: ContextRegistry = field(default_factory=ContextRegistry)
 
-    # Layer context (for multi-composer)
-    layer_index: Optional[int] = None
-    layer_id: Optional[str] = None
-    previous_output: Optional[bytes] = None
+    # IN-REVIEW Crypto primitives (populated by decorators)
+    # aesgcm: Any = None
+    # chacha: Any = None
+    # cipher: Any = None
 
     def generate_nonce(self) -> bytes:
         """Generate a fresh nonce."""
@@ -82,6 +120,19 @@ class AlgorithmContext:
     def elapsed_ms(self) -> float:
         """Get elapsed time since context creation."""
         return (time.perf_counter() - self.start_time) * 1000
+
+    def layers(self) -> Dict[str, LayerMaterial]:
+        return self.registry.layers
+
+    def layer(self, name: str) -> LayerMaterial:
+        """Access layer materials by name."""
+        return self.registry.get_layer(name)
+
+    def derive(self, kdf_name: str, salt_name: str) -> bytes:
+        """Derive key using registered KDF and salt."""
+        if self.key is None:
+            raise ValueError("No base key available")
+        return self.registry.derive_key(kdf_name, self.key, salt_name)
 
 
 @dataclass
