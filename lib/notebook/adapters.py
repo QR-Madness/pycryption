@@ -8,8 +8,6 @@ implementations to make them compatible with ComposerSession.
 """
 from __future__ import annotations
 
-from typing import Optional
-
 from lib.notebook.context import AlgorithmResult
 from lib.notebook.decorators import algorithm, with_key
 from lib.algorithms import (
@@ -41,22 +39,18 @@ def wrap_aes256gcm(key: bytes, name: str = "AES-256-GCM") -> object:
         def encrypt(self, data: bytes, ctx) -> bytes:
             payload = Aes256GcmInput(plaintext=data)
             result = inner.encrypt(payload)
-            # Store nonce in context for later retrieval
-            ctx.nonce = getattr(result, "nonce")
-            return getattr(result, "ciphertext")
+            # Store nonce in registry for decryption
+            ctx.set_nonce("aes-nonce", result.nonce)
+            return result.ciphertext
 
         def decrypt(self, data: bytes, ctx) -> bytes:
+            nonce = ctx.get_nonce("aes-nonce")
             payload = Aes256GcmOutput(
                 ciphertext=data,
-                nonce=ctx.nonce,
+                nonce=nonce,
                 metrics_report={},
             )
             result = inner.decrypt(payload)
-            return getattr(result, "plaintext")
+            return result.plaintext
 
     return WrappedAes256Gcm()
-
-
-# Future adapters can be added here:
-# - wrap_chacha20poly1305(key, name) -> wraps ChaCha20-Poly1305 implementation
-# - wrap_kyber(key, name) -> wraps post-quantum implementation

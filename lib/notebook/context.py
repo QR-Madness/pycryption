@@ -1,42 +1,197 @@
 # lib/notebook/context.py
 """
-Context and result types for notebook-style algorithms.
+Centralized cryptographic context for algorithm development.
 
-These dataclasses hold configuration, runtime context, and operation results.
+The CryptoRegistry is the single source of truth for all cryptographic
+materials: keys, salts, nonces, derived keys, KDFs, and layer compositions.
 """
 from __future__ import annotations
 
 import os
 import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional, Callable
+from typing import Any, Callable, Dict, Optional, Union
 
 from lib.EncryptionAlgorithm import SIMPLE_COMPOSER_TYPE
 from lib.util.kms.providers import KeyProvider
 
+# Type aliases
 KDFFunction = Callable[[bytes, bytes], bytes]  # (key, salt) -> derived_key
+EncapsulateFunction = Callable[[bytes], tuple[bytes, bytes]]  # public_key -> (ciphertext, shared_secret)
+DecapsulateFunction = Callable[[bytes, bytes], bytes]  # (secret_key, ciphertext) -> shared_secret
 
 
 @dataclass
-class LayerMaterial:
-    """"
-    Single layer's cryptographic materials.
+class CryptoRegistry:
     """
-    key: Optional[bytes] = None
-    salt: Optional[bytes] = None
-    nonce: Optional[bytes] = None
-    derived_key: Optional[bytes] = None
+    Centralized registry for all cryptographic materials.
+    
+    This is the single source of truth persisted across encrypt/decrypt calls.
+    All materials are keyed by string names for easy composition.
+    """
+    
+    # Raw materials
+    keys: Dict[str, bytes] = field(default_factory=dict)
+    salts: Dict[str, bytes] = field(default_factory=dict)
+    nonces: Dict[str, bytes] = field(default_factory=dict)
+    
+    # Derived/computed materials
+    derived_keys: Dict[str, bytes] = field(default_factory=dict)
+    shared_secrets: Dict[str, bytes] = field(default_factory=dict)
+    
+    # Functions
+    kdfs: Dict[str, KDFFunction] = field(default_factory=dict)
+    encapsulators: Dict[str, EncapsulateFunction] = field(default_factory=dict)
+    decapsulators: Dict[str, DecapsulateFunction] = field(default_factory=dict)
+    
+    # Arbitrary storage for algorithm-specific data
+    data: Dict[str, Any] = field(default_factory=dict)
+    
+    # --- Key Management ---
+    
+    def set_key(self, name: str, key: bytes) -> bytes:
+        """Store a key by name."""
+        self.keys[name] = key
+        return key
+    
+    def get_key(self, name: str) -> Optional[bytes]:
+        """Retrieve a key by name."""
+        return self.keys.get(name)
+    
+    def require_key(self, name: str) -> bytes:
+        """Get key or raise if not found."""
+        if name not in self.keys:
+            raise KeyError(f"Key '{name}' not registered")
+        return self.keys[name]
+    
+    # --- Salt Management ---
+    
+    def set_salt(self, name: str, salt: Optional[bytes] = None, size: int = 32) -> bytes:
+        """Store or generate a salt. Returns existing if already set."""
+        if name not in self.salts:
+            self.salts[name] = salt if salt is not None else os.urandom(size)
+        return self.salts[name]
+    
+    def get_salt(self, name: str) -> Optional[bytes]:
+        """Retrieve a salt by name."""
+        return self.salts.get(name)
+    
+    def require_salt(self, name: str) -> bytes:
+        """Get salt or raise if not found."""
+        if name not in self.salts:
+            raise KeyError(f"Salt '{name}' not registered")
+        return self.salts[name]
+    
+    # --- Nonce Management ---
+    
+    def set_nonce(self, name: str, nonce: Optional[bytes] = None, size: int = 12) -> bytes:
+        """Store or generate a nonce. Always overwrites (nonces should be unique)."""
+        self.nonces[name] = nonce if nonce is not None else os.urandom(size)
+        return self.nonces[name]
+    
+    def get_nonce(self, name: str) -> Optional[bytes]:
+        """Retrieve a nonce by name."""
+        return self.nonces.get(name)
+    
+    def require_nonce(self, name: str) -> bytes:
+        """Get nonce or raise if not found."""
+        if name not in self.nonces:
+            raise KeyError(f"Nonce '{name}' not registered")
+        return self.nonces[name]
+    
+    # --- KDF Management ---
+    
+    def set_kdf(self, name: str, func: KDFFunction) -> None:
+        """Register a KDF function."""
+        self.kdfs[name] = func
+    
+    def derive(self, kdf_name: str, key: bytes, salt_name: str, cache_as: Optional[str] = None) -> bytes:
+        """
+        Derive a key using a registered KDF and salt.
+        
+        Args:
+            kdf_name: Name of registered KDF function
+            key: Input key material
+            salt_name: Name of registered salt
+            cache_as: If provided, cache the derived key under this name
+        """
+        if kdf_name not in self.kdfs:
+            raise KeyError(f"KDF '{kdf_name}' not registered")
+        salt = self.require_salt(salt_name)
+        derived = self.kdfs[kdf_name](key, salt)
+        if cache_as:
+            self.derived_keys[cache_as] = derived
+        return derived
+    
+    def get_derived_key(self, name: str) -> Optional[bytes]:
+        """Retrieve a cached derived key."""
+        return self.derived_keys.get(name)
+    
+    # --- Encapsulation (for PQ/KEM algorithms) ---
+    
+    def set_encapsulator(self, name: str, func: EncapsulateFunction) -> None:
+        """Register an encapsulation function (e.g., Kyber encaps)."""
+        self.encapsulators[name] = func
+    
+    def set_decapsulator(self, name: str, func: DecapsulateFunction) -> None:
+        """Register a decapsulation function (e.g., Kyber decaps)."""
+        self.decapsulators[name] = func
+    
+    def encapsulate(self, name: str, public_key: bytes, cache_as: Optional[str] = None) -> tuple[bytes, bytes]:
+        """
+        Run encapsulation, returning (ciphertext, shared_secret).
+        
+        Args:
+            name: Name of registered encapsulator
+            public_key: Public key bytes
+            cache_as: If provided, cache the shared secret under this name
+        """
+        if name not in self.encapsulators:
+            raise KeyError(f"Encapsulator '{name}' not registered")
+        ciphertext, shared_secret = self.encapsulators[name](public_key)
+        if cache_as:
+            self.shared_secrets[cache_as] = shared_secret
+        return ciphertext, shared_secret
+    
+    def decapsulate(self, name: str, secret_key: bytes, ciphertext: bytes, cache_as: Optional[str] = None) -> bytes:
+        """
+        Run decapsulation, returning shared_secret.
+        
+        Args:
+            name: Name of registered decapsulator
+            secret_key: Secret key bytes
+            ciphertext: Encapsulated ciphertext
+            cache_as: If provided, cache the shared secret under this name
+        """
+        if name not in self.decapsulators:
+            raise KeyError(f"Decapsulator '{name}' not registered")
+        shared_secret = self.decapsulators[name](secret_key, ciphertext)
+        if cache_as:
+            self.shared_secrets[cache_as] = shared_secret
+        return shared_secret
+    
+    def get_shared_secret(self, name: str) -> Optional[bytes]:
+        """Retrieve a cached shared secret."""
+        return self.shared_secrets.get(name)
+    
+    # --- Generic Data Storage ---
+    
+    def set(self, name: str, value: Any) -> None:
+        """Store arbitrary data."""
+        self.data[name] = value
+    
+    def get(self, name: str, default: Any = None) -> Any:
+        """Retrieve arbitrary data."""
+        return self.data.get(name, default)
 
 
 @dataclass
 class AlgorithmConfig:
     """
     Configuration for a decorated algorithm class.
-
-    Stored as a class attribute and copied to instances
-    to avoid shared mutable state between instances.
+    
+    Stored as a class attribute and copied to instances.
     """
-
     name: str = "Unnamed"
     composer_type: str = SIMPLE_COMPOSER_TYPE
     key_provider: Optional[KeyProvider] = None
@@ -55,96 +210,67 @@ class AlgorithmConfig:
 
 
 @dataclass
-class ContextRegistry:
-    """Central registry for KDFs and layer materials, keyed by string names."""
-
-    kdfs: Dict[str, KDFFunction] = field(default_factory=dict)
-    layers: Dict[str, LayerMaterial] = field(default_factory=dict)
-    salts: Dict[str, bytes] = field(default_factory=dict)
-
-    def register_kdf(self, name: str, func: KDFFunction) -> None:
-        self.kdfs[name] = func
-
-    def register_salt(self, name: str, salt: Optional[bytes] = None, size: int = 16) -> bytes:
-        if salt is None:
-            salt = os.urandom(size)
-        self.salts[name] = salt
-        return salt
-
-    def get_layer(self, name: str) -> LayerMaterial:
-        if name not in self.layers:
-            self.layers[name] = LayerMaterial()
-        return self.layers[name]
-
-    def derive_key(self, kdf_name: str, key: bytes, salt_name: str) -> bytes:
-        if kdf_name not in self.kdfs:
-            raise KeyError(f"KDF '{kdf_name}' not registered")
-        if salt_name not in self.salts:
-            raise KeyError(f"Salt '{salt_name}' not registered")
-        return self.kdfs[kdf_name](key, self.salts[salt_name])
-
-
-@dataclass
 class AlgorithmContext:
     """
-    Context object injected into algorithm encrypt/decrypt methods.
-
-    Provides key material, nonce, timing utilities, and optional
-    crypto primitives configured by decorators.
+    Context injected into algorithm encrypt/decrypt methods.
+    
+    Provides access to the centralized CryptoRegistry and timing utilities.
+    The registry persists across calls; context is recreated each call.
     """
-
-    # Primary Key material
+    
     key: bytes = field(default=b"")
-    key_id: Optional[str] = None
-
-    # Nonce/IV (auto-generated if not provided)
-    nonce: bytes = field(default=b"")
-    nonce_size: int = 12
-
-    # Timing & metrics
     start_time: float = field(default=0.0)
     metrics: Dict[str, Any] = field(default_factory=dict)
-
-    registry: ContextRegistry = field(default_factory=ContextRegistry)
-
-    # IN-REVIEW Crypto primitives (populated by decorators)
-    # aesgcm: Any = None
-    # chacha: Any = None
-    # cipher: Any = None
-
-    def generate_nonce(self) -> bytes:
-        """Generate a fresh nonce."""
-        self.nonce = os.urandom(self.nonce_size)
-        return self.nonce
-
+    registry: CryptoRegistry = field(default_factory=CryptoRegistry)
+    
     def elapsed_ms(self) -> float:
         """Get elapsed time since context creation."""
         return (time.perf_counter() - self.start_time) * 1000
-
-    def layers(self) -> Dict[str, LayerMaterial]:
-        return self.registry.layers
-
-    def layer(self, name: str) -> LayerMaterial:
-        """Access layer materials by name."""
-        return self.registry.get_layer(name)
-
-    def derive(self, kdf_name: str, salt_name: str) -> bytes:
-        """Derive key using registered KDF and salt."""
-        if self.key is None:
-            raise ValueError("No base key available")
-        return self.registry.derive_key(kdf_name, self.key, salt_name)
+    
+    # --- Convenience accessors (delegate to registry) ---
+    
+    def set_salt(self, name: str, salt: Optional[bytes] = None, size: int = 32) -> bytes:
+        """Store or generate a salt."""
+        return self.registry.set_salt(name, salt, size)
+    
+    def get_salt(self, name: str) -> Optional[bytes]:
+        """Get a salt by name."""
+        return self.registry.get_salt(name)
+    
+    def set_nonce(self, name: str, nonce: Optional[bytes] = None, size: int = 12) -> bytes:
+        """Store or generate a nonce."""
+        return self.registry.set_nonce(name, nonce, size)
+    
+    def get_nonce(self, name: str) -> Optional[bytes]:
+        """Get a nonce by name."""
+        return self.registry.get_nonce(name)
+    
+    def set_kdf(self, name: str, func: KDFFunction) -> None:
+        """Register a KDF function."""
+        self.registry.set_kdf(name, func)
+    
+    def derive(self, kdf_name: str, salt_name: str, cache_as: Optional[str] = None) -> bytes:
+        """Derive a key using the context's primary key."""
+        return self.registry.derive(kdf_name, self.key, salt_name, cache_as)
+    
+    def get_derived_key(self, name: str) -> Optional[bytes]:
+        """Get a cached derived key."""
+        return self.registry.get_derived_key(name)
+    
+    def set(self, name: str, value: Any) -> None:
+        """Store arbitrary data in registry."""
+        self.registry.set(name, value)
+    
+    def get(self, name: str, default: Any = None) -> Any:
+        """Retrieve arbitrary data from registry."""
+        return self.registry.get(name, default)
 
 
 @dataclass
 class AlgorithmResult:
-    """
-    Result wrapper from algorithm operations.
-
-    Contains output data, nonce used, collected metrics, and error state.
-    """
-
+    """Result wrapper from algorithm operations."""
+    
     output: bytes
-    nonce: Optional[bytes] = None
     metrics: Dict[str, Any] = field(default_factory=dict)
     success: bool = True
     error: Optional[str] = None

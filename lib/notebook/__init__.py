@@ -7,12 +7,6 @@ and utilities for rapid prototyping in Jupyter notebooks.
 
 Usage:
     from lib.notebook import *
-
-Modules:
-    context     - AlgorithmConfig, AlgorithmContext, AlgorithmResult
-    decorators  - @algorithm, @with_key, @with_aead, etc.
-    composer    - ComposerSession, AlgorithmMetrics
-    utils       - generate_key, quick_test, benchmark
 """
 
 # Context types
@@ -20,6 +14,7 @@ from lib.notebook.context import (
     AlgorithmConfig,
     AlgorithmContext,
     AlgorithmResult,
+    CryptoRegistry,
 )
 
 # Decorators
@@ -71,6 +66,7 @@ __all__ = [
     "AlgorithmConfig",
     "AlgorithmContext",
     "AlgorithmResult",
+    "CryptoRegistry",
     # Decorators
     "algorithm",
     "with_key",

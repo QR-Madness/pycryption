@@ -33,6 +33,7 @@ dependencies = [
     "ptyprocess==0.7.0",
     "pure-eval==0.2.3",
     "pycparser==2.23",
+    "pycryptodome>=3.23.0",
     "pygments==2.19.2",
     "python-dateutil==2.9.0.post0",
     "pytz==2025.2",
@@ -45,4 +46,9 @@ dependencies = [
     "typing-extensions==4.15.0",
     "tzdata==2025.3",
     "wcwidth==0.2.14",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
 ]

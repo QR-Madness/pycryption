@@ -41,7 +41,7 @@ def quick_test(algo_instance: Any, test_data: bytes = b"Hello, PyCryption!") -> 
         return
 
     # Decrypt
-    dec_result = algo_instance.decrypt(enc_result.output, nonce=enc_result.nonce)
+    dec_result = algo_instance.decrypt(enc_result.output)
     print(f"Decrypt: {dec_result}")
     if not dec_result.success:
         print(f"  ERROR: {dec_result.error}")
@@ -89,7 +89,7 @@ def benchmark(
             if enc_result.success:
                 encrypt_times.append(enc_result.metrics.get("elapsed_ms", 0))
 
-            dec_result = algo_instance.decrypt(enc_result.output, nonce=enc_result.nonce)
+            dec_result = algo_instance.decrypt(enc_result.output)
             if dec_result.success:
                 decrypt_times.append(dec_result.metrics.get("elapsed_ms", 0))
 

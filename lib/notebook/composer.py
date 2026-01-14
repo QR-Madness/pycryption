@@ -105,12 +105,12 @@ class ComposerSession:
 
         return result
 
-    def decrypt(self, name: str, data: bytes, nonce: Optional[bytes] = None) -> AlgorithmResult:
+    def decrypt(self, name: str, data: bytes) -> AlgorithmResult:
         """Decrypt data using the named algorithm."""
         algo = self.get(name)
         metrics = self._metrics[name]
 
-        result = algo.decrypt(data, nonce=nonce)
+        result = algo.decrypt(data)
         metrics.decrypt_calls += 1
 
         if result.success:
@@ -132,7 +132,7 @@ class ComposerSession:
         if not enc_result.success:
             return False
 
-        dec_result = self.decrypt(name, enc_result.output, nonce=enc_result.nonce)
+        dec_result = self.decrypt(name, enc_result.output)
         if not dec_result.success:
             return False
 

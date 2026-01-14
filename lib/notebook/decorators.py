@@ -3,7 +3,7 @@
 Decorators for notebook-style algorithm development.
 
 These decorators handle logistics: key injection, context building,
-nonce generation, metrics collection, and crypto primitive setup.
+and metrics collection.
 """
 from __future__ import annotations
 
@@ -15,7 +15,8 @@ from lib.EncryptionAlgorithm import SIMPLE_COMPOSER_TYPE
 from lib.notebook.context import (
     AlgorithmConfig,
     AlgorithmContext,
-    AlgorithmResult, KDFFunction,
+    AlgorithmResult,
+    CryptoRegistry,
 )
 from lib.util.kms.providers import (
     KeyProvider,
@@ -45,11 +46,16 @@ def _ensure_config(cls: Type[T]) -> AlgorithmConfig:
 
 
 def _build_context(instance: Any, operation: str) -> AlgorithmContext:
-    """Build context for an algorithm operation."""
+    """Build context for an algorithm operation, reusing persisted registry."""
     config = getattr(instance, "_config", AlgorithmConfig())
+
+    # Persist registry on instance so all materials survive across calls
+    if not hasattr(instance, "_registry"):
+        instance._registry = CryptoRegistry()
 
     ctx = AlgorithmContext(
         start_time=time.perf_counter(),
+        registry=instance._registry,
     )
     ctx.metrics["algorithm"] = config.name
     ctx.metrics["operation"] = operation
@@ -59,9 +65,9 @@ def _build_context(instance: Any, operation: str) -> AlgorithmContext:
         ctx.key = config.key_provider.get_key()
         ctx.metrics["key_provider"] = config.key_provider.__class__.__name__
 
-    # Apply any context modifiers (from decorators)
+    # Apply any context modifiers
     for modifier in config.context_modifiers:
-        modifier(ctx)
+        modifier(ctx, instance=instance)
 
     return ctx
 
@@ -80,10 +86,6 @@ def algorithm(
 
     Wraps encrypt/decrypt methods to inject AlgorithmContext and
     return AlgorithmResult with metrics.
-
-    Args:
-        name: Algorithm identifier for registration and metrics
-        composer_type: SIMPLE_COMPOSER_TYPE or MULTI_COMPOSER_TYPE
     """
 
     def decorator(cls: Type[T]) -> Type[T]:
@@ -91,7 +93,6 @@ def algorithm(
         config.name = name
         config.composer_type = composer_type
 
-        # Wrap __init__ to copy config to instance
         original_init = cls.__init__ if hasattr(cls, "__init__") else None
 
         @wraps(original_init or object.__init__)
@@ -102,14 +103,12 @@ def algorithm(
 
         cls.__init__ = new_init  # type: ignore
 
-        # Wrap encrypt method
         if hasattr(cls, "encrypt"):
             original_encrypt = getattr(cls, "encrypt")
 
             @wraps(original_encrypt)
             def wrapped_encrypt(self: Any, data: bytes, **kwargs: Any) -> AlgorithmResult:
                 ctx = _build_context(self, "encrypt")
-                ctx.generate_nonce()
 
                 try:
                     output = original_encrypt(self, data, ctx, **kwargs)
@@ -119,13 +118,11 @@ def algorithm(
 
                     return AlgorithmResult(
                         output=output,
-                        nonce=ctx.nonce,
                         metrics=ctx.metrics,
                     )
                 except Exception as e:
                     return AlgorithmResult(
                         output=b"",
-                        nonce=ctx.nonce,
                         metrics=ctx.metrics,
                         success=False,
                         error=str(e),
@@ -133,7 +130,6 @@ def algorithm(
 
             cls.encrypt = wrapped_encrypt  # type: ignore
 
-        # Wrap decrypt method
         if hasattr(cls, "decrypt"):
             original_decrypt = getattr(cls, "decrypt")
 
@@ -141,12 +137,9 @@ def algorithm(
             def wrapped_decrypt(
                     self: Any,
                     data: bytes,
-                    nonce: Optional[bytes] = None,
                     **kwargs: Any,
             ) -> AlgorithmResult:
                 ctx = _build_context(self, "decrypt")
-                if nonce:
-                    ctx.nonce = nonce
 
                 try:
                     output = original_decrypt(self, data, ctx, **kwargs)
@@ -181,11 +174,7 @@ def algorithm(
 def with_key(key: Union[bytes, KeyProvider]) -> Callable[[Type[T]], Type[T]]:
     """
     Inject a key or KeyProvider into the algorithm context.
-
     The key will be available as `ctx.key` in encrypt/decrypt methods.
-
-    Args:
-        key: Raw key bytes or a KeyProvider instance
     """
 
     def decorator(cls: Type[T]) -> Type[T]:
@@ -205,15 +194,7 @@ def with_password(
         kdf: str = "pbkdf2",
         iterations: int = 480000,
 ) -> Callable[[Type[T]], Type[T]]:
-    """
-    Derive and inject a key from password using KDF.
-
-    Args:
-        password: Password string
-        salt: Salt bytes (must be provided for reproducibility)
-        kdf: KDF algorithm ("pbkdf2" or "scrypt")
-        iterations: KDF iterations
-    """
+    """Derive and inject a key from password using KDF."""
 
     def decorator(cls: Type[T]) -> Type[T]:
         config = _ensure_config(cls)
@@ -229,12 +210,7 @@ def with_password(
 
 
 def with_env_key(env_var: str) -> Callable[[Type[T]], Type[T]]:
-    """
-    Load and inject key from environment variable.
-
-    Args:
-        env_var: Environment variable name containing the key
-    """
+    """Load and inject key from environment variable."""
 
     def decorator(cls: Type[T]) -> Type[T]:
         config = _ensure_config(cls)
@@ -244,62 +220,19 @@ def with_env_key(env_var: str) -> Callable[[Type[T]], Type[T]]:
     return decorator
 
 
-def with_kdf(name: str, func: KDFFunction) -> Callable[[Type[T]], Type[T]]:
-    """Register a KDF function by name, bound to algorithm context."""
-
-    def decorator(cls: Type[T]) -> Type[T]:
-        config = _ensure_config(cls)
-
-        def register_kdf(ctx: AlgorithmContext) -> None:
-            ctx.registry.register_kdf(name, func)
-
-        config.context_modifiers.append(register_kdf)
-        return cls
-
-    return decorator
-
-
-def with_salt(name: str, salt: Optional[bytes] = None, size: int = 16) -> Callable[[Type[T]], Type[T]]:
-    """Register a named salt, persisted on the instance."""
-    def decorator(cls: Type[T]) -> Type[T]:
-        config = _ensure_config(cls)
-        original_init = cls.__init__ if hasattr(cls, '__init__') else None
-
-        def new_init(self, *args, **kwargs):
-            if original_init:
-                original_init(self, *args, **kwargs)
-            if not hasattr(self, '_salts'):
-                self._salts = {}
-            if name not in self._salts:
-                self._salts[name] = salt if salt is not None else os.urandom(size)
-
-        cls.__init__ = new_init
-
-        def register_salt(ctx: AlgorithmContext, instance) -> None:
-            ctx.registry.register_salt(name, instance._salts.get(name), size)
-
-        config.context_modifiers.append(register_salt)
-        return cls
-    return decorator
-
-
 # -----------------------------------------------------------------------------
-# Crypto Primitive Decorators
+# Metrics Decorator
 # -----------------------------------------------------------------------------
 
 
 def with_metrics() -> Callable[[Type[T]], Type[T]]:
-    """
-    Enable detailed metrics collection.
-
-    Adds timestamp and detailed flag to collected metrics.
-    """
+    """Enable detailed metrics collection."""
 
     def decorator(cls: Type[T]) -> Type[T]:
         config = _ensure_config(cls)
         config.collect_metrics = True
 
-        def add_detailed_metrics(ctx: AlgorithmContext) -> None:
+        def add_detailed_metrics(ctx: AlgorithmContext, **kwargs: Any) -> None:
             ctx.metrics["detailed"] = True
             ctx.metrics["timestamp"] = time.time()
 
