@@ -18,17 +18,15 @@ Usage:
 """
 import os
 import time
-from typing import Optional, Union
+from typing import Optional
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 from lib.EncryptionAlgorithm import (
+    AlgorithmAdapter,
     EncryptionAlgorithm,
-    SIMPLE_COMPOSER_TYPE,
-    SimpleEncryptionAlgorithmInput,
-    SimpleEncryptionAlgorithmOutput,
-    MultiEncryptionAlgorithmInput,
-    MultiEncryptionAlgorithmOutput,
+    EncryptionInput,
+    EncryptionOutput,
 )
 from lib.util.kms.providers import KeyProvider, inject_key
 
@@ -38,42 +36,69 @@ from lib.util.kms.providers import KeyProvider, inject_key
 # -----------------------------------------------------------------------------
 
 
-class Aes256GcmInput(SimpleEncryptionAlgorithmInput):
+class Aes256GcmInput(EncryptionInput):
     """Input payload for AES-256-GCM encryption."""
 
-    plaintext: bytes
     associated_data: Optional[bytes]
-    metrics_report: Optional[dict]  # Set after decryption
 
     def __init__(
         self,
         plaintext: bytes,
         associated_data: Optional[bytes] = None,
     ):
-        super().__init__()
-        self.plaintext = plaintext
+        super().__init__(data=plaintext)
         self.associated_data = associated_data
-        self.metrics_report = None
+
+    @property
+    def plaintext(self) -> bytes:
+        return self.data
 
 
-class Aes256GcmOutput(SimpleEncryptionAlgorithmOutput):
-    """Output payload from AES-256-GCM encryption."""
+class Aes256GcmOutput(EncryptionOutput):
+    """Output payload from AES-256-GCM operations."""
 
-    ciphertext: bytes
-    nonce: bytes  # 12 bytes
+    nonce: bytes
     associated_data: Optional[bytes]
 
     def __init__(
         self,
         ciphertext: bytes,
         nonce: bytes,
-        metrics_report: dict,
+        metrics: Optional[dict] = None,
         associated_data: Optional[bytes] = None,
     ):
-        super().__init__(metrics_report=metrics_report, output=ciphertext)
-        self.ciphertext = ciphertext
+        super().__init__(data=ciphertext, metrics=metrics or {})
         self.nonce = nonce
         self.associated_data = associated_data
+
+    @property
+    def ciphertext(self) -> bytes:
+        return self.data
+
+
+# -----------------------------------------------------------------------------
+# Notebook Adapter
+# -----------------------------------------------------------------------------
+
+
+class Aes256GcmAdapter(AlgorithmAdapter):
+    """Adapter for marshalling bytes <-> Aes256GcmInput/Output."""
+
+    def prepare_encrypt_input(self, data: bytes) -> Aes256GcmInput:
+        return Aes256GcmInput(plaintext=data)
+
+    def extract_encrypt_output(self, output: Aes256GcmOutput, state: dict) -> bytes:
+        state["nonce"] = output.nonce
+        return output.ciphertext
+
+    def prepare_decrypt_input(self, data: bytes, state: dict) -> Aes256GcmOutput:
+        return Aes256GcmOutput(
+            ciphertext=data,
+            nonce=state["nonce"],
+        )
+
+    def extract_decrypt_output(self, output: EncryptionOutput) -> bytes:
+        return output.data
 
 
 # -----------------------------------------------------------------------------
@@ -96,7 +121,12 @@ class Aes256GcmAlgorithm(EncryptionAlgorithm):
     _key_provider: Optional[KeyProvider] = None
 
     def __init__(self) -> None:
-        super().__init__(SIMPLE_COMPOSER_TYPE)
+        super().__init__()
+
+    @classmethod
+    def adapter(cls) -> Aes256GcmAdapter:
+        """Return the adapter for bytes <-> structured I/O conversion."""
+        return Aes256GcmAdapter()
 
     def _generate_nonce(self) -> bytes:
         """Generate cryptographically secure random nonce."""
@@ -116,10 +146,10 @@ class Aes256GcmAlgorithm(EncryptionAlgorithm):
     @inject_key(key_length=32)
     def encrypt(
         self,
-        payload: Union[MultiEncryptionAlgorithmInput, SimpleEncryptionAlgorithmInput],
+        payload: EncryptionInput,
         *,
         _injected_key: Optional[bytes] = None,
-    ) -> Union[MultiEncryptionAlgorithmOutput, SimpleEncryptionAlgorithmOutput]:
+    ) -> EncryptionOutput:
         """
         Encrypt plaintext using AES-256-GCM.
 
@@ -130,7 +160,6 @@ class Aes256GcmAlgorithm(EncryptionAlgorithm):
 
         start = time.perf_counter()
 
-        # Key injected by decorator
         key = _injected_key or self._get_key()
 
         aesgcm = AESGCM(key)
@@ -142,7 +171,7 @@ class Aes256GcmAlgorithm(EncryptionAlgorithm):
         return Aes256GcmOutput(
             ciphertext=ciphertext,
             nonce=nonce,
-            metrics_report={
+            metrics={
                 "algorithm": "AES-256-GCM",
                 "operation": "encrypt",
                 "plaintext_bytes": len(payload.plaintext),
@@ -155,10 +184,10 @@ class Aes256GcmAlgorithm(EncryptionAlgorithm):
     @inject_key(key_length=32)
     def decrypt(
         self,
-        payload: Union[MultiEncryptionAlgorithmOutput, SimpleEncryptionAlgorithmOutput],
+        payload: EncryptionOutput,
         *,
         _injected_key: Optional[bytes] = None,
-    ) -> Union[MultiEncryptionAlgorithmOutput, SimpleEncryptionAlgorithmOutput]:
+    ) -> EncryptionOutput:
         """
         Decrypt ciphertext using AES-256-GCM.
 
@@ -183,20 +212,16 @@ class Aes256GcmAlgorithm(EncryptionAlgorithm):
 
         elapsed_ms = (time.perf_counter() - start) * 1000
 
-        result = Aes256GcmInput(
-            plaintext=plaintext,
-            associated_data=payload.associated_data,
+        return EncryptionOutput(
+            data=plaintext,
+            metrics={
+                "algorithm": "AES-256-GCM",
+                "operation": "decrypt",
+                "ciphertext_bytes": len(payload.ciphertext),
+                "plaintext_bytes": len(plaintext),
+                "elapsed_ms": round(elapsed_ms, 3),
+            },
         )
-        result._is_decrypted = True
-        result.metrics_report = {
-            "algorithm": "AES-256-GCM",
-            "operation": "decrypt",
-            "ciphertext_bytes": len(payload.ciphertext),
-            "plaintext_bytes": len(plaintext),
-            "elapsed_ms": round(elapsed_ms, 3),
-        }
-
-        return result  # type: ignore[return-value]
 
 
 # -----------------------------------------------------------------------------

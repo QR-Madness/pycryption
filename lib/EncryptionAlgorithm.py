@@ -1,97 +1,78 @@
-from typing import Literal, Union
+from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
 
 
-MULTI_COMPOSER_TYPE = "multi"
-SIMPLE_COMPOSER_TYPE = "simple"
-
-
-class SimpleEncryptionAlgorithmOutput:
+@dataclass
+class EncryptionInput:
     """
-    *Belongs to*: SimpleEncryptionComposer.py
+    Base input for all encryption algorithms.
 
-    Override this class to define the output structure for encryption algorithms.
-    """
-
-    metrics_report: dict
-    output: bytes
-
-    def __init__(self, metrics_report: dict, output: bytes):
-        self.metrics_report = metrics_report
-        self.output = output
-
-
-class SimpleEncryptionAlgorithmInput:
-    """
-    *Belongs to*: SimpleEncryptionComposer.py
-
-    Override this class to define the input structure for encryption algorithms.
+    Subclasses add algorithm-specific fields (e.g., associated_data for GCM).
+    The ``data`` field carries the raw plaintext bytes.
     """
 
-    _composer_type = "simple"
-    _is_decrypted: bool
-
-    def __init__(self):
-        pass
-    
+    data: bytes
+    metadata: dict = field(default_factory=dict)
 
 
-class MultiEncryptionAlgorithmOutput:
+@dataclass
+class EncryptionOutput:
     """
-    *Belongs to*: MultiEncryptionComposer.py
+    Base output from all encryption operations (encrypt and decrypt).
 
-    Override this class to define the output structure for encryption algorithms.
-    """
-
-    def __init__(self):
-        pass
-
-
-class MultiEncryptionAlgorithmInput:
-    """
-    *Belongs to*: MultiEncryptionComposer.py
-
-    Override this class to define the input structure for encryption algorithms.
+    The ``data`` field carries the primary payload (ciphertext after encrypt,
+    plaintext after decrypt).  Algorithm-specific auxiliary data (nonces, tags,
+    etc.) belongs on subclass fields or in ``metadata``.
     """
 
-    _composer_type = "multi"
+    data: bytes
+    metrics: dict = field(default_factory=dict)
+    metadata: dict = field(default_factory=dict)
 
-    def __init__(self):
-        pass
 
-
-class EncryptionAlgorithm:
+class EncryptionAlgorithm(ABC):
     """
     Base class for all encryption algorithms.
+
+    Subclasses must implement ``encrypt`` and ``decrypt``.
+    Key management is handled externally via KeyProvider.
     """
 
-    _composer_type: str
+    @abstractmethod
+    def encrypt(self, payload: EncryptionInput) -> EncryptionOutput:
+        """Encrypt the payload and return an EncryptionOutput."""
+        ...
 
-    def __init__(self, composer_type: Literal["multi", "simple"]):
-        """
-        Initializes the encryption algorithm with the specified composer type.
+    @abstractmethod
+    def decrypt(self, payload: EncryptionOutput) -> EncryptionOutput:
+        """Decrypt the payload and return an EncryptionOutput."""
+        ...
 
-        :param composer_type: Used to specify the type of composer. Multi-layer or simple (single algorithm).
-        :type composer_type: Literal["multi", "simple"]
-        """
-        self._composer_type = composer_type
 
-    def InjectKey(self, func):
-        """
-        Decorator to inject key handling logic into encryption/decryption methods.
-        """
-        def wrapper(*args, **kwargs):
-            # Key injection logic can be implemented here
-            return func(*args, **kwargs)
-        return wrapper
+class AlgorithmAdapter(ABC):
+    """
+    Defines how to convert between raw bytes and algorithm-specific
+    structured Input/Output types.
 
-    def encrypt(
-        self,
-        payload: Union[MultiEncryptionAlgorithmInput, SimpleEncryptionAlgorithmInput],
-    ) -> Union[MultiEncryptionAlgorithmOutput, SimpleEncryptionAlgorithmOutput]:
-        raise NotImplementedError("Encrypt method must be implemented by subclasses.")
+    Each embedded algorithm provides a companion adapter that implements
+    these four methods. The ``state`` dict is a dependency-free mechanism
+    for persisting auxiliary data (nonces, IVs, tags, etc.) across
+    encrypt/decrypt calls — the ``adapt()`` factory in ``lib/notebook``
+    maps it to the CryptoRegistry automatically.
+    """
 
-    def decrypt(
-        self,
-        payload: Union[MultiEncryptionAlgorithmOutput, SimpleEncryptionAlgorithmOutput],
-    ) -> Union[MultiEncryptionAlgorithmOutput, SimpleEncryptionAlgorithmOutput]:
-        raise NotImplementedError("Decrypt method must be implemented by subclasses.")
+    @abstractmethod
+    def prepare_encrypt_input(self, data: bytes) -> EncryptionInput:
+        """Convert raw plaintext bytes to algorithm-specific encrypt input."""
+
+    @abstractmethod
+    def extract_encrypt_output(self, output: EncryptionOutput, state: dict) -> bytes:
+        """Extract ciphertext from output, store auxiliary data in *state*."""
+
+    @abstractmethod
+    def prepare_decrypt_input(self, data: bytes, state: dict) -> EncryptionOutput:
+        """Build decrypt input from ciphertext and stored auxiliary data."""
+
+    @abstractmethod
+    def extract_decrypt_output(self, output: EncryptionOutput) -> bytes:
+        """Extract plaintext from decrypt output."""

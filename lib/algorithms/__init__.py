@@ -5,6 +5,7 @@ Encryption algorithm implementations.
 All algorithms follow the KeyProvider pattern for decoupled key management.
 """
 from lib.algorithms.Aes256GcmAlgorithm import (
+    Aes256GcmAdapter,
     Aes256GcmAlgorithm,
     Aes256GcmInput,
     Aes256GcmOutput,
@@ -13,6 +14,7 @@ from lib.algorithms.Aes256GcmAlgorithm import (
 )
 
 __all__ = [
+    "Aes256GcmAdapter",
     "Aes256GcmAlgorithm",
     "Aes256GcmInput",
     "Aes256GcmOutput",
