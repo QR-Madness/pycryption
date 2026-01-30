@@ -22,10 +22,10 @@ uv sync
 python -m pytest lib/tests/
 
 # Run a single test file
-python -m pytest lib/tests/test_simple_composer.py
+python -m pytest lib/tests/test_file.py
 
 # Run a specific test
-python -m pytest lib/tests/test_simple_composer.py::TestSimpleComposer::test_composer_initialization
+python -m pytest lib/tests/test_file.py::TestClass::test_method
 
 # Run Jupyter notebooks
 jupyter notebook
@@ -33,29 +33,46 @@ jupyter notebook
 
 ## Architecture
 
-### Composers
+### Core Components
 
-Composers are algorithm harnesses that manage encryption lifecycle and metrics. Two types exist:
-
-- **SimpleEncryptionComposer** (`lib/SimpleEncryptionComposer.py`): Production-ready. Wraps a single algorithm with "fire and forget" semantics - you bootstrap an algorithm, call encrypt/decrypt, and get metrics automatically.
-
-- **MultiEncryptionComposer** (`lib/prototype/`): Experimental. Supports layering multiple encryption algorithms sequentially. Uses `MultiEncryptionComposerLayer` for per-layer state and `EncryptionComposerLayerIterator` for traversal.
+- **`lib/EncryptionAlgorithm.py`**: Base class and Input/Output types for all algorithms
+- **`lib/algorithms/`**: Production-ready algorithm implementations (e.g., `Aes256GcmAlgorithm`)
+- **`lib/notebook/`**: Declarative API for rapid prototyping in Jupyter notebooks
+- **`lib/util/kms/`**: Key management via KeyProvider pattern
 
 ### Creating New Algorithms
 
-1. Subclass `EncryptionAlgorithm` from `lib/EncryptionAlgorithm.py`
-2. Set composer type in `__init__`: `super().__init__(composer_type=SIMPLE_COMPOSER_TYPE)` or `MULTI_COMPOSER_TYPE`
-3. Implement `encrypt()` and `decrypt()` methods
-4. Use corresponding Input/Output classes: `SimpleEncryptionAlgorithmInput`/`Output` or `MultiEncryptionAlgorithmInput`/`Output`
-5. Configure key management via KeyProvider (see below)
+**Option 1: Using the Notebook API (recommended for prototyping)**
 
-### Key Providers (`lib/util/key_providers.py`)
+```python
+from lib.notebook import algorithm, with_key, generate_key
+
+@algorithm("MyAlgorithm")
+@with_key(generate_key(32))
+class MyAlgorithm:
+    def encrypt(self, data: bytes, ctx) -> bytes:
+        # ctx.key contains the injected key
+        return encrypted_data
+
+    def decrypt(self, data: bytes, ctx) -> bytes:
+        return decrypted_data
+```
+
+**Option 2: Subclassing EncryptionAlgorithm (production implementations)**
+
+1. Subclass `EncryptionAlgorithm` from `lib/EncryptionAlgorithm.py`
+2. Set composer type: `super().__init__(composer_type=SIMPLE_COMPOSER_TYPE)`
+3. Implement `encrypt()` and `decrypt()` methods
+4. Use `SimpleEncryptionAlgorithmInput`/`Output` or `MultiEncryptionAlgorithmInput`/`Output`
+5. Configure key management via KeyProvider
+
+### Key Providers (`lib/util/kms/`)
 
 Key management is decoupled from algorithms via the KeyProvider pattern:
 
 ```python
-from lib.util.key_providers import LocalKeyProvider, use_key_provider
-from lib.algorithms import Aes256GcmAlgorithm
+from lib.util.kms.providers import LocalKeyProvider, use_key_provider
+from lib.algorithms import Aes256GcmAlgorithm, create_aes256gcm
 
 # Option 1: Class decorator
 @use_key_provider(LocalKeyProvider(my_key))
@@ -75,47 +92,43 @@ algo = create_aes256gcm_from_password(password, salt)
 - `LocalKeyProvider` - In-memory key (testing/development)
 - `EnvKeyProvider` - Key from environment variable (containers/CI)
 - `DerivedKeyProvider` - KDF from password (PBKDF2, scrypt)
-- `KmsKeyProvider` - External KMS integration (stub, extend for AWS/GCP/Azure)
+- `KmsKeyProvider` - External KMS integration (extend for AWS/GCP/Azure)
 
 **Method Decorator:** Use `@inject_key(key_length=32)` on encrypt/decrypt to auto-inject keys.
 
-### Notebook API (`lib/notebook.py`)
+### Notebook API (`lib/notebook/`)
 
 Declarative API for rapid algorithm prototyping in Jupyter notebooks:
 
-```python
-from lib.notebook import *
+- `context.py` - AlgorithmConfig, AlgorithmContext, AlgorithmResult, ContextRegistry
+- `decorators.py` - @algorithm, @with_key, @with_kdf, @with_salt, etc.
+- `composer.py` - ComposerSession, AlgorithmMetrics
+- `utils.py` - generate_key, generate_salt, quick_test, benchmark
+- `adapters.py` - Bridges lib/algorithms to notebook API (e.g., `wrap_aes256gcm`)
 
-# Define algorithm with decorators
-@algorithm("My-AES-Experiment")
-@with_key(generate_key(32))
-@with_aead()
-class MyAlgorithm:
-    def encrypt(self, data: bytes, ctx: AlgorithmContext) -> bytes:
-        return ctx.aesgcm.encrypt(ctx.nonce, data, None)
-
-    def decrypt(self, data: bytes, ctx: AlgorithmContext) -> bytes:
-        return ctx.aesgcm.decrypt(ctx.nonce, data, None)
-
-# Test immediately
-quick_test(MyAlgorithm())
-benchmark(MyAlgorithm())
-```
-
-**Available Decorators:**
+**Decorators** handle logistics (key injection, context, metrics):
 - `@algorithm(name)` - Base decorator, wraps class with context injection
 - `@with_key(key)` - Inject raw key or KeyProvider
 - `@with_password(password, salt)` - Derive key from password
-- `@with_aead()` - Pre-configure AESGCM primitive in context
+- `@with_env_key(env_var)` - Load key from environment variable
+- `@with_kdf(name, func)` - Register a named KDF function
+- `@with_salt(name, salt)` - Register a named salt (auto-generates if not provided)
 - `@with_metrics()` - Enable detailed metrics collection
-- `@aes256gcm_algorithm()` - All-in-one for AES-256-GCM
 
-**Context Object (`ctx`):** Injected into encrypt/decrypt with:
-- `ctx.key` - Key bytes
+**AlgorithmContext (`ctx`)** injected into encrypt/decrypt:
+- `ctx.key` - Key bytes from provider
 - `ctx.nonce` - Auto-generated nonce
-- `ctx.aesgcm` - AESGCM instance (if using `@with_aead`)
 - `ctx.metrics` - Dict for collecting metrics
 - `ctx.elapsed_ms()` - Timing helper
+- `ctx.registry` - Access to named KDFs, salts, and layer materials
+- `ctx.derive(kdf_name, salt_name)` - Derive key using registered KDF and salt
+- `ctx.layer(name)` - Access named layer materials for multi-layer encryption
+
+**ComposerSession** for benchmarking prototypes against lib/algorithms:
+- `register()` - Register algorithm instances
+- `test_all()` - Round-trip verification
+- `benchmark_all()` - Performance benchmarks
+- `compare()` - Side-by-side comparison (sorted by speed)
 
 ### Notebooks
 
@@ -124,6 +137,7 @@ Interactive experimentation via Jupyter notebooks:
 - `Asymmetric.ipynb` - Asymmetric encryption examples
 - `KYBER.ipynb` - Post-quantum key encapsulation
 - `Encryption Composer.ipynb` - Composer usage examples
+- `General Cryptography.ipynb` - General cryptographic concepts
 
 ## Security
 

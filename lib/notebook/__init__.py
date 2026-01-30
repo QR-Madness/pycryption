@@ -40,6 +40,9 @@ from lib.notebook.utils import (
     benchmark,
 )
 
+# Report builder
+from lib.notebook.report import ReportBuilder
+
 # Adapters for lib/algorithms
 from lib.notebook.adapters import (
     wrap_aes256gcm,
@@ -88,6 +91,8 @@ __all__ = [
     "generate_salt",
     "quick_test",
     "benchmark",
+    # Report builder
+    "ReportBuilder",
     # Adapters
     "wrap_aes256gcm",
     # Constants
