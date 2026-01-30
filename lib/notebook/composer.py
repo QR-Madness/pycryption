@@ -24,6 +24,11 @@ class AlgorithmMetrics:
     total_decrypt_ms: float = 0.0
     total_bytes_processed: int = 0
     errors: int = 0
+    # Memory tracking
+    total_peak_encrypt_memory: int = 0
+    total_peak_decrypt_memory: int = 0
+    memory_samples_encrypt: int = 0
+    memory_samples_decrypt: int = 0
 
     @property
     def avg_encrypt_ms(self) -> float:
@@ -37,8 +42,20 @@ class AlgorithmMetrics:
             return self.total_decrypt_ms / self.decrypt_calls
         return 0.0
 
+    @property
+    def avg_peak_encrypt_memory(self) -> float:
+        if self.memory_samples_encrypt > 0:
+            return self.total_peak_encrypt_memory / self.memory_samples_encrypt
+        return 0.0
+
+    @property
+    def avg_peak_decrypt_memory(self) -> float:
+        if self.memory_samples_decrypt > 0:
+            return self.total_peak_decrypt_memory / self.memory_samples_decrypt
+        return 0.0
+
     def as_dict(self) -> Dict[str, Any]:
-        return {
+        d: Dict[str, Any] = {
             "name": self.name,
             "encrypt_calls": self.encrypt_calls,
             "decrypt_calls": self.decrypt_calls,
@@ -47,6 +64,11 @@ class AlgorithmMetrics:
             "total_bytes_processed": self.total_bytes_processed,
             "errors": self.errors,
         }
+        if self.memory_samples_encrypt > 0:
+            d["avg_peak_encrypt_memory_bytes"] = round(self.avg_peak_encrypt_memory)
+        if self.memory_samples_decrypt > 0:
+            d["avg_peak_decrypt_memory_bytes"] = round(self.avg_peak_decrypt_memory)
+        return d
 
 
 class ComposerSession:
@@ -100,6 +122,9 @@ class ComposerSession:
         if result.success:
             metrics.total_encrypt_ms += result.metrics.get("elapsed_ms", 0)
             metrics.total_bytes_processed += len(data)
+            if "peak_memory_bytes" in result.metrics:
+                metrics.total_peak_encrypt_memory += result.metrics["peak_memory_bytes"]
+                metrics.memory_samples_encrypt += 1
         else:
             metrics.errors += 1
 
@@ -116,6 +141,9 @@ class ComposerSession:
         if result.success:
             metrics.total_decrypt_ms += result.metrics.get("elapsed_ms", 0)
             metrics.total_bytes_processed += len(data)
+            if "peak_memory_bytes" in result.metrics:
+                metrics.total_peak_decrypt_memory += result.metrics["peak_memory_bytes"]
+                metrics.memory_samples_decrypt += 1
         else:
             metrics.errors += 1
 
@@ -181,12 +209,19 @@ class ComposerSession:
             bench = self.benchmark(name, data_sizes=[data_size], iterations=iterations)
             if bench["benchmarks"]:
                 entry = bench["benchmarks"][0]
-                results.append({
+                comparison: Dict[str, Any] = {
                     "algorithm": name,
                     "avg_encrypt_ms": entry["avg_encrypt_ms"],
                     "avg_decrypt_ms": entry["avg_decrypt_ms"],
                     "throughput_mbps": entry["throughput_mbps"],
-                })
+                    "ops_per_sec": entry.get("ops_per_sec", 0),
+                    "p99_encrypt_ms": entry.get("p99_encrypt_ms", 0),
+                }
+                if "avg_expansion_ratio" in entry:
+                    comparison["expansion_ratio"] = entry["avg_expansion_ratio"]
+                if "avg_peak_encrypt_memory_bytes" in entry:
+                    comparison["peak_memory_bytes"] = entry["avg_peak_encrypt_memory_bytes"]
+                results.append(comparison)
 
         results.sort(key=lambda x: x["avg_encrypt_ms"])
         return results

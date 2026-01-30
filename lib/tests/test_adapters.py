@@ -1,10 +1,10 @@
 # lib/tests/test_adapters.py
-"""Tests for the adapter factory and backward-compatible wrappers."""
+"""Tests for the adapter factory."""
 import pytest
 
 from lib.algorithms import Aes256GcmAdapter, Aes256GcmAlgorithm
 from lib.EncryptionAlgorithm import EncryptionAlgorithm
-from lib.notebook.adapters import adapt, wrap_aes256gcm
+from lib.notebook.adapters import adapt
 from lib.notebook.composer import ComposerSession
 from lib.notebook.utils import generate_key
 from lib.util.kms.providers import LocalKeyProvider
@@ -91,29 +91,61 @@ class TestAdapt:
         assert dec.output == plaintext
 
 
-class TestWrapAes256Gcm:
-    """Backward compatibility tests for wrap_aes256gcm."""
+class TestAdaptMemoryProfiling:
+    """Tests for memory profiling and metrics on adapted algorithms."""
 
-    def test_round_trip(self, key: bytes) -> None:
-        algo = wrap_aes256gcm(key)
+    def test_adapt_with_profile_memory(self, key: bytes) -> None:
+        algo = adapt(Aes256GcmAlgorithm, key, name="AES-Mem", profile_memory=True)
+        result = algo.encrypt(b"test data")
+        assert result.success
+        assert "peak_memory_bytes" in result.metrics
+        assert result.metrics["peak_memory_bytes"] >= 0
+        assert "memory_delta_bytes" in result.metrics
+        assert result.metrics.get("memory_profiling") is True
 
-        plaintext = b"backward compat test"
-        enc = algo.encrypt(plaintext)
-        assert enc.success
+    def test_adapt_without_profile_memory(self, key: bytes) -> None:
+        algo = adapt(Aes256GcmAlgorithm, key, name="AES-NoMem")
+        result = algo.encrypt(b"test data")
+        assert result.success
+        assert "peak_memory_bytes" not in result.metrics
 
+    def test_adapt_with_collect_metrics(self, key: bytes) -> None:
+        algo = adapt(Aes256GcmAlgorithm, key, name="AES-Det", collect_metrics=True)
+        result = algo.encrypt(b"test data")
+        assert result.success
+        assert result.metrics.get("detailed") is True
+        assert "timestamp" in result.metrics
+
+    def test_adapt_full_stack(self, key: bytes) -> None:
+        algo = adapt(
+            Aes256GcmAlgorithm,
+            key,
+            name="AES-Full",
+            profile_memory=True,
+            collect_metrics=True,
+        )
+        result = algo.encrypt(b"test data")
+        assert result.success
+        assert "peak_memory_bytes" in result.metrics
+        assert result.metrics.get("memory_profiling") is True
+        assert result.metrics.get("detailed") is True
+        assert "timestamp" in result.metrics
+        assert "elapsed_ms" in result.metrics
+        assert "expansion_ratio" in result.metrics
+
+    def test_decrypt_also_profiled(self, key: bytes) -> None:
+        algo = adapt(Aes256GcmAlgorithm, key, name="AES-DecMem", profile_memory=True)
+        enc = algo.encrypt(b"test")
         dec = algo.decrypt(enc.output)
         assert dec.success
+        assert "peak_memory_bytes" in dec.metrics
+
+    def test_round_trip_with_profiling(self, key: bytes) -> None:
+        algo = adapt(Aes256GcmAlgorithm, key, name="AES-RT", profile_memory=True)
+        plaintext = b"round-trip with memory profiling"
+        enc = algo.encrypt(plaintext)
+        dec = algo.decrypt(enc.output)
         assert dec.output == plaintext
-
-    def test_default_name(self, key: bytes) -> None:
-        algo = wrap_aes256gcm(key)
-        result = algo.encrypt(b"test")
-        assert result.metrics["algorithm"] == "AES-256-GCM"
-
-    def test_custom_name(self, key: bytes) -> None:
-        algo = wrap_aes256gcm(key, name="Custom-AES")
-        result = algo.encrypt(b"test")
-        assert result.metrics["algorithm"] == "Custom-AES"
 
 
 class TestComposerSessionIntegration:
@@ -133,3 +165,13 @@ class TestComposerSessionIntegration:
         benchmarks = session.benchmark("AES-Bench", data_sizes=[100, 1000], iterations=3)
         assert "benchmarks" in benchmarks
         assert len(benchmarks["benchmarks"]) == 2
+
+    def test_session_with_memory_profiling(self, key: bytes) -> None:
+        session = ComposerSession()
+        session.register(
+            adapt(Aes256GcmAlgorithm, key, name="AES-MemSess", profile_memory=True)
+        )
+        session.encrypt("AES-MemSess", b"test")
+
+        report = session.report()
+        assert "avg_peak_encrypt_memory_bytes" in report["AES-MemSess"]

@@ -216,6 +216,15 @@ class ReportBuilder:
             for row in rows:
                 print("  ".join(str(v).ljust(w) for v, w in zip(row, widths)))
 
+    @staticmethod
+    def _format_memory(n: Union[int, float]) -> str:
+        """Format a byte count as a human-readable string."""
+        if n >= 1_048_576:
+            return f"{n / 1_048_576:.1f} MB"
+        if n >= 1024:
+            return f"{n / 1024:.1f} KB"
+        return f"{int(n)} B"
+
     def comparison_table(
         self,
         comparison: List[Dict[str, Any]],
@@ -228,22 +237,43 @@ class ReportBuilder:
             comparison: List of comparison dicts from session.compare()
             title: Table title
         """
-        self.table(
-            data=comparison,
-            columns=["algorithm", "avg_encrypt_ms", "avg_decrypt_ms", "throughput_mbps"],
-            title=title,
-            column_labels={
-                "algorithm": "Algorithm",
-                "avg_encrypt_ms": "Encrypt (ms)",
-                "avg_decrypt_ms": "Decrypt (ms)",
-                "throughput_mbps": "Throughput (MB/s)",
-            },
-        )
+        if not comparison:
+            print("(no data)")
+            return
+
+        columns = ["algorithm", "avg_encrypt_ms", "avg_decrypt_ms", "throughput_mbps"]
+        labels: Dict[str, str] = {
+            "algorithm": "Algorithm",
+            "avg_encrypt_ms": "Encrypt (ms)",
+            "avg_decrypt_ms": "Decrypt (ms)",
+            "throughput_mbps": "Throughput (MB/s)",
+            "ops_per_sec": "Ops/sec",
+            "p99_encrypt_ms": "P99 Encrypt (ms)",
+            "expansion_ratio": "Expansion",
+            "peak_memory_bytes": "Peak Memory",
+        }
+
+        # Add optional columns if present in data
+        optional_cols = ["ops_per_sec", "p99_encrypt_ms", "expansion_ratio", "peak_memory_bytes"]
+        for col in optional_cols:
+            if any(col in row for row in comparison):
+                columns.append(col)
+
+        # Format memory as human-readable
+        formatted = []
+        for row in comparison:
+            fmt_row = dict(row)
+            if "peak_memory_bytes" in fmt_row:
+                fmt_row["peak_memory_bytes"] = self._format_memory(fmt_row["peak_memory_bytes"])
+            formatted.append(fmt_row)
+
+        self.table(data=formatted, columns=columns, title=title, column_labels=labels)
 
     def benchmark_table(
         self,
         benchmarks: Dict[str, Dict[str, Any]],
         title: str = "Benchmark Results",
+        detailed: bool = False,
     ) -> None:
         """
         Render benchmark results from ComposerSession.benchmark_all() output.
@@ -251,61 +281,101 @@ class ReportBuilder:
         Args:
             benchmarks: Dict mapping algorithm names to benchmark results
             title: Table title
+            detailed: If True, include statistical metrics (P99, stddev, ops/sec)
         """
         if self.format == "rich":
-            self._benchmark_rich(benchmarks, title)
+            self._benchmark_rich(benchmarks, title, detailed)
         else:
-            # Flatten for other formats
+            col_labels: Dict[str, str] = {
+                "size": "Size",
+                "avg_encrypt_ms": "Encrypt (ms)",
+                "avg_decrypt_ms": "Decrypt (ms)",
+                "throughput_mbps": "Throughput",
+                "p99_encrypt_ms": "P99 (ms)",
+                "stddev_encrypt_ms": "Stddev (ms)",
+                "ops_per_sec": "Ops/sec",
+                "peak_memory": "Peak Memory",
+            }
             for algo_name, results in benchmarks.items():
                 algo_title = f"{title}: {algo_name}"
-                data = [
-                    {
+                data = []
+                for b in results["benchmarks"]:
+                    row: Dict[str, Any] = {
                         "size": f"{b['size_bytes']:,} B",
                         "avg_encrypt_ms": b["avg_encrypt_ms"],
                         "avg_decrypt_ms": b["avg_decrypt_ms"],
                         "throughput_mbps": f"{b['throughput_mbps']} MB/s",
                     }
-                    for b in results["benchmarks"]
-                ]
-                self.table(
-                    data=data,
-                    columns=["size", "avg_encrypt_ms", "avg_decrypt_ms", "throughput_mbps"],
-                    title=algo_title,
-                    column_labels={
-                        "size": "Size",
-                        "avg_encrypt_ms": "Encrypt (ms)",
-                        "avg_decrypt_ms": "Decrypt (ms)",
-                        "throughput_mbps": "Throughput",
-                    },
-                )
+                    if detailed:
+                        row["p99_encrypt_ms"] = b.get("p99_encrypt_ms", "-")
+                        row["stddev_encrypt_ms"] = b.get("stddev_encrypt_ms", "-")
+                        row["ops_per_sec"] = b.get("ops_per_sec", "-")
+                    if "avg_peak_encrypt_memory_bytes" in b:
+                        row["peak_memory"] = self._format_memory(b["avg_peak_encrypt_memory_bytes"])
+                    data.append(row)
+
+                cols = ["size", "avg_encrypt_ms", "avg_decrypt_ms", "throughput_mbps"]
+                if detailed:
+                    cols.extend(["p99_encrypt_ms", "stddev_encrypt_ms", "ops_per_sec"])
+                if any("peak_memory" in r for r in data):
+                    cols.append("peak_memory")
+
+                self.table(data=data, columns=cols, title=algo_title, column_labels=col_labels)
+
+                scaling = results.get("scaling_factor")
+                if scaling is not None:
+                    self.info(f"Scaling factor (large/small throughput): {scaling}x")
                 print()
 
     def _benchmark_rich(
         self,
         benchmarks: Dict[str, Dict[str, Any]],
         title: str,
+        detailed: bool = False,
     ) -> None:
         """Render benchmark results using rich with grouped sections."""
         colors = self._get_theme_colors()
 
         for algo_name, results in benchmarks.items():
+            # Detect if memory data is present
+            has_memory = any(
+                "avg_peak_encrypt_memory_bytes" in b for b in results["benchmarks"]
+            )
+
             table = Table(title=f"{algo_name}", border_style=colors["border"])
             table.add_column("Size", style=colors["header"])
             table.add_column("Encrypt (ms)", justify="right")
             table.add_column("Decrypt (ms)", justify="right")
             table.add_column("Throughput", justify="right")
+            if detailed:
+                table.add_column("P99 (ms)", justify="right")
+                table.add_column("Stddev (ms)", justify="right")
+                table.add_column("Ops/sec", justify="right")
+            if has_memory:
+                table.add_column("Peak Memory", justify="right")
 
             for i, b in enumerate(results["benchmarks"]):
                 style = colors["row_even"] if i % 2 == 0 else colors["row_odd"]
-                table.add_row(
+                row_values = [
                     f"{b['size_bytes']:,} B",
                     str(b["avg_encrypt_ms"]),
                     str(b["avg_decrypt_ms"]),
                     f"{b['throughput_mbps']} MB/s",
-                    style=style,
-                )
+                ]
+                if detailed:
+                    row_values.append(str(b.get("p99_encrypt_ms", "-")))
+                    row_values.append(str(b.get("stddev_encrypt_ms", "-")))
+                    row_values.append(str(b.get("ops_per_sec", "-")))
+                if has_memory:
+                    mem = b.get("avg_peak_encrypt_memory_bytes")
+                    row_values.append(self._format_memory(mem) if mem is not None else "-")
+                table.add_row(*row_values, style=style)
 
             self._console.print(table)
+
+            scaling = results.get("scaling_factor")
+            if scaling is not None:
+                self.info(f"Scaling factor (large/small throughput): {scaling}x")
             self._console.print()
 
     def session_report(
@@ -320,8 +390,11 @@ class ReportBuilder:
             report: Dict mapping algorithm names to metrics
             title: Report title
         """
-        data = [
-            {
+        has_memory = any("avg_peak_encrypt_memory_bytes" in m for m in report.values())
+
+        data = []
+        for name, m in report.items():
+            row: Dict[str, Any] = {
                 "algorithm": name,
                 "operations": f"{m['encrypt_calls']}E / {m['decrypt_calls']}D",
                 "avg_encrypt_ms": f"{m['avg_encrypt_ms']:.3f}",
@@ -329,22 +402,24 @@ class ReportBuilder:
                 "total_bytes": f"{m['total_bytes_processed']:,}",
                 "errors": m["errors"] if m["errors"] > 0 else "-",
             }
-            for name, m in report.items()
-        ]
+            if has_memory and "avg_peak_encrypt_memory_bytes" in m:
+                row["peak_memory"] = self._format_memory(m["avg_peak_encrypt_memory_bytes"])
+            data.append(row)
 
-        self.table(
-            data=data,
-            columns=["algorithm", "operations", "avg_encrypt_ms", "avg_decrypt_ms", "total_bytes", "errors"],
-            title=title,
-            column_labels={
-                "algorithm": "Algorithm",
-                "operations": "Operations",
-                "avg_encrypt_ms": "Avg Encrypt (ms)",
-                "avg_decrypt_ms": "Avg Decrypt (ms)",
-                "total_bytes": "Total Bytes",
-                "errors": "Errors",
-            },
-        )
+        columns = ["algorithm", "operations", "avg_encrypt_ms", "avg_decrypt_ms", "total_bytes", "errors"]
+        labels: Dict[str, str] = {
+            "algorithm": "Algorithm",
+            "operations": "Operations",
+            "avg_encrypt_ms": "Avg Encrypt (ms)",
+            "avg_decrypt_ms": "Avg Decrypt (ms)",
+            "total_bytes": "Total Bytes",
+            "errors": "Errors",
+            "peak_memory": "Avg Peak Memory",
+        }
+        if has_memory:
+            columns.append("peak_memory")
+
+        self.table(data=data, columns=columns, title=title, column_labels=labels)
 
     def test_results(
         self,

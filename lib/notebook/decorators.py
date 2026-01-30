@@ -104,12 +104,34 @@ def algorithm(name: str) -> Callable[[Type[T]], Type[T]]:
             @wraps(original_encrypt)
             def wrapped_encrypt(self: Any, data: bytes, **kwargs: Any) -> AlgorithmResult:
                 ctx = _build_context(self, "encrypt")
+                config = getattr(self, "_config", AlgorithmConfig())
+
+                # Start memory profiling if enabled
+                _mem_profiling = config.profile_memory
+                if _mem_profiling:
+                    import tracemalloc
+                    if not tracemalloc.is_tracing():
+                        tracemalloc.start()
+                    tracemalloc.clear_traces()
 
                 try:
                     output = original_encrypt(self, data, ctx, **kwargs)
                     ctx.metrics["elapsed_ms"] = round(ctx.elapsed_ms(), 3)
                     ctx.metrics["input_bytes"] = len(data)
                     ctx.metrics["output_bytes"] = len(output) if output else 0
+
+                    # Expansion ratio (encrypt only)
+                    if output and len(data) > 0:
+                        ctx.metrics["expansion_ratio"] = round(len(output) / len(data), 4)
+
+                    # Memory profiling results
+                    if _mem_profiling:
+                        import tracemalloc
+                        _, peak = tracemalloc.get_traced_memory()
+                        ctx.metrics["peak_memory_bytes"] = peak
+                        snapshot = tracemalloc.take_snapshot()
+                        stats = snapshot.statistics("lineno")
+                        ctx.metrics["memory_delta_bytes"] = sum(s.size for s in stats)
 
                     return AlgorithmResult(
                         output=output,
@@ -135,12 +157,30 @@ def algorithm(name: str) -> Callable[[Type[T]], Type[T]]:
                     **kwargs: Any,
             ) -> AlgorithmResult:
                 ctx = _build_context(self, "decrypt")
+                config = getattr(self, "_config", AlgorithmConfig())
+
+                # Start memory profiling if enabled
+                _mem_profiling = config.profile_memory
+                if _mem_profiling:
+                    import tracemalloc
+                    if not tracemalloc.is_tracing():
+                        tracemalloc.start()
+                    tracemalloc.clear_traces()
 
                 try:
                     output = original_decrypt(self, data, ctx, **kwargs)
                     ctx.metrics["elapsed_ms"] = round(ctx.elapsed_ms(), 3)
                     ctx.metrics["input_bytes"] = len(data)
                     ctx.metrics["output_bytes"] = len(output) if output else 0
+
+                    # Memory profiling results
+                    if _mem_profiling:
+                        import tracemalloc
+                        _, peak = tracemalloc.get_traced_memory()
+                        ctx.metrics["peak_memory_bytes"] = peak
+                        snapshot = tracemalloc.take_snapshot()
+                        stats = snapshot.statistics("lineno")
+                        ctx.metrics["memory_delta_bytes"] = sum(s.size for s in stats)
 
                     return AlgorithmResult(
                         output=output,
@@ -232,6 +272,27 @@ def with_metrics() -> Callable[[Type[T]], Type[T]]:
             ctx.metrics["timestamp"] = time.time()
 
         config.context_modifiers.append(add_detailed_metrics)
+        return cls
+
+    return decorator
+
+
+def with_memory_profiling() -> Callable[[Type[T]], Type[T]]:
+    """
+    Enable memory profiling for encrypt/decrypt operations.
+
+    Uses tracemalloc to measure peak memory and memory delta per operation.
+    Note: tracemalloc adds measurable overhead. Use for profiling, not production benchmarks.
+    """
+
+    def decorator(cls: Type[T]) -> Type[T]:
+        config = _ensure_config(cls)
+        config.profile_memory = True
+
+        def add_memory_profiling_flag(ctx: AlgorithmContext, **kwargs: Any) -> None:
+            ctx.metrics["memory_profiling"] = True
+
+        config.context_modifiers.append(add_memory_profiling_flag)
         return cls
 
     return decorator

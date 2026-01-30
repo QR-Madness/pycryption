@@ -194,6 +194,7 @@ class AlgorithmConfig:
     name: str = "Unnamed"
     key_provider: Optional[KeyProvider] = None
     collect_metrics: bool = False
+    profile_memory: bool = False
     context_modifiers: list = field(default_factory=list)
 
     def copy(self) -> "AlgorithmConfig":
@@ -202,6 +203,7 @@ class AlgorithmConfig:
             name=self.name,
             key_provider=self.key_provider,
             collect_metrics=self.collect_metrics,
+            profile_memory=self.profile_memory,
             context_modifiers=list(self.context_modifiers),
         )
 

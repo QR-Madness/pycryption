@@ -22,9 +22,11 @@
 
 ### Metrics & Reporting
 - [x] Basic timing metrics in algorithm output
-- [ ] Add throughput metrics (bytes/sec) to `SimpleComposerMetrics`
-- [ ] Add memory usage tracking if feasible
-- [ ] Create structured report export (JSON/dict format)
+- [x] Add throughput metrics (ops/sec) and statistical timing (min/max/stddev/p50/p95/p99)
+- [x] Add memory usage tracking via `@with_memory_profiling()` decorator (opt-in, tracemalloc-based)
+- [x] Add expansion ratio metrics for encrypt operations
+- [x] Add scaling analysis across data sizes in `benchmark()`
+- [x] Create structured report export (`ReportBuilder` with rich/HTML/text output)
 
 ---
 
@@ -55,7 +57,7 @@
 
 ---
 
-## Notebook API (`lib/notebook.py`)
+## Notebook API (`lib/notebook/`)
 
 - [x] Create declarative `@algorithm` decorator with context injection
 - [x] Create `@with_key`, `@with_password`, `@with_env_key` decorators
@@ -65,6 +67,11 @@
 - [x] Add `quick_test()` and `benchmark()` utilities
 - [x] Add `@with_chacha20` decorator for ChaCha20-Poly1305
 - [x] Add `ComposerSession` class for algorithm management & benchmarking
+- [x] Add `@with_metrics()` decorator for detailed metrics (timestamps)
+- [x] Add `@with_memory_profiling()` decorator for memory tracking
+- [x] Add `CryptoRegistry` for persistent cryptographic material storage
+- [x] Add `ReportBuilder` for styled Jupyter output (rich/HTML/text)
+- [x] Add `adapt()` factory to bridge production algorithms to notebook API
 - [ ] Add layer context fields for multi-composer integration
 - [ ] Add `@with_compression` decorator for pre-encrypt compression
 - [ ] Add visualization helpers for benchmark results (matplotlib/pandas)

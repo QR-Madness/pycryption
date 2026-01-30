@@ -4,7 +4,7 @@ import os
 import pytest
 
 from lib.notebook.composer import AlgorithmMetrics, ComposerSession
-from lib.notebook.decorators import algorithm, with_key
+from lib.notebook.decorators import algorithm, with_key, with_memory_profiling
 
 
 @pytest.fixture
@@ -127,3 +127,87 @@ class TestAlgorithmMetricsDataclass:
         d = m.as_dict()
         assert d["name"] == "t"
         assert d["avg_encrypt_ms"] == 1.5
+
+    def test_avg_peak_encrypt_memory(self) -> None:
+        m = AlgorithmMetrics(
+            name="t",
+            total_peak_encrypt_memory=2048,
+            memory_samples_encrypt=2,
+        )
+        assert m.avg_peak_encrypt_memory == 1024.0
+
+    def test_avg_peak_decrypt_memory(self) -> None:
+        m = AlgorithmMetrics(
+            name="t",
+            total_peak_decrypt_memory=3000,
+            memory_samples_decrypt=3,
+        )
+        assert m.avg_peak_decrypt_memory == 1000.0
+
+    def test_avg_memory_zero_without_samples(self) -> None:
+        m = AlgorithmMetrics(name="t")
+        assert m.avg_peak_encrypt_memory == 0.0
+        assert m.avg_peak_decrypt_memory == 0.0
+
+    def test_as_dict_includes_memory_when_sampled(self) -> None:
+        m = AlgorithmMetrics(
+            name="t",
+            encrypt_calls=1,
+            total_peak_encrypt_memory=4096,
+            memory_samples_encrypt=1,
+        )
+        d = m.as_dict()
+        assert "avg_peak_encrypt_memory_bytes" in d
+        assert d["avg_peak_encrypt_memory_bytes"] == 4096
+
+    def test_as_dict_excludes_memory_without_samples(self) -> None:
+        m = AlgorithmMetrics(name="t", encrypt_calls=1, total_encrypt_ms=1.0)
+        d = m.as_dict()
+        assert "avg_peak_encrypt_memory_bytes" not in d
+        assert "avg_peak_decrypt_memory_bytes" not in d
+
+
+class TestComposerMemoryMetrics:
+    def test_memory_metrics_accumulated_via_encrypt(self, key: bytes) -> None:
+        @algorithm("MemAlgo")
+        @with_key(key)
+        @with_memory_profiling()
+        class Algo:
+            def encrypt(self, data: bytes, ctx) -> bytes:
+                return data[::-1]
+
+            def decrypt(self, data: bytes, ctx) -> bytes:
+                return data[::-1]
+
+        session = ComposerSession()
+        session.register(Algo())
+        session.encrypt("MemAlgo", b"test")
+
+        report = session.report()
+        assert "avg_peak_encrypt_memory_bytes" in report["MemAlgo"]
+
+    def test_memory_metrics_accumulated_via_decrypt(self, key: bytes) -> None:
+        @algorithm("MemDecAlgo")
+        @with_key(key)
+        @with_memory_profiling()
+        class Algo:
+            def encrypt(self, data: bytes, ctx) -> bytes:
+                return data[::-1]
+
+            def decrypt(self, data: bytes, ctx) -> bytes:
+                return data[::-1]
+
+        session = ComposerSession()
+        session.register(Algo())
+        session.decrypt("MemDecAlgo", b"test")
+
+        report = session.report()
+        assert "avg_peak_decrypt_memory_bytes" in report["MemDecAlgo"]
+
+    def test_no_memory_metrics_without_profiling(self, key: bytes) -> None:
+        session = ComposerSession()
+        session.register(_make_algo(key))
+        session.encrypt("TestAlgo", b"test")
+
+        report = session.report()
+        assert "avg_peak_encrypt_memory_bytes" not in report["TestAlgo"]

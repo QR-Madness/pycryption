@@ -11,7 +11,12 @@ from __future__ import annotations
 from typing import Any, Optional, Type, Union
 
 from lib.EncryptionAlgorithm import AlgorithmAdapter, EncryptionAlgorithm
-from lib.notebook.decorators import algorithm, with_key
+from lib.notebook.decorators import (
+    algorithm,
+    with_key,
+    with_memory_profiling,
+    with_metrics,
+)
 from lib.util.kms.providers import KeyProvider, LocalKeyProvider
 
 # Key used to persist the adapter state dict inside CryptoRegistry.data
@@ -24,6 +29,8 @@ def adapt(
     name: Optional[str] = None,
     *,
     adapter: Optional[AlgorithmAdapter] = None,
+    profile_memory: bool = False,
+    collect_metrics: bool = False,
 ) -> Any:
     """
     Generic factory to wrap a lib/algorithms implementation for the notebook API.
@@ -38,9 +45,11 @@ def adapt(
         key: Raw key bytes or a KeyProvider instance
         name: Algorithm name for registration (defaults to class name)
         adapter: Optional adapter override. If not provided, calls algo_class.adapter().
+        profile_memory: Enable memory profiling via tracemalloc.
+        collect_metrics: Enable detailed metrics collection (timestamps).
 
     Returns:
-        Notebook-compatible algorithm instance (decorated with @algorithm, @with_key)
+        Notebook-compatible algorithm instance
 
     Raises:
         TypeError: If the algorithm class does not provide an adapter() classmethod
@@ -73,8 +82,6 @@ def adapt(
     _adapter = adapter
     _inner = inner
 
-    @algorithm(algo_name)
-    @with_key(key_provider)
     class AdaptedAlgorithm:
         """Auto-generated notebook adapter for a lib/algorithms implementation."""
 
@@ -92,31 +99,15 @@ def adapt(
             result = _inner.decrypt(payload)
             return _adapter.extract_decrypt_output(result)
 
+    # Apply decorators imperatively (bottom-up, same order as stacking)
+    if collect_metrics:
+        AdaptedAlgorithm = with_metrics()(AdaptedAlgorithm)
+    if profile_memory:
+        AdaptedAlgorithm = with_memory_profiling()(AdaptedAlgorithm)
+    AdaptedAlgorithm = with_key(key_provider)(AdaptedAlgorithm)
+    AdaptedAlgorithm = algorithm(algo_name)(AdaptedAlgorithm)
+
     AdaptedAlgorithm.__name__ = f"Adapted{algo_class.__name__}"
     AdaptedAlgorithm.__qualname__ = f"Adapted{algo_class.__name__}"
 
     return AdaptedAlgorithm()
-
-
-# ---------------------------------------------------------------------------
-# Backward-compatible convenience wrappers
-# ---------------------------------------------------------------------------
-
-
-def wrap_aes256gcm(key: bytes, name: str = "AES-256-GCM") -> Any:
-    """
-    Wrap the proven AES-256-GCM implementation for notebook API.
-
-    This is a convenience wrapper around adapt(). Preserved for backward
-    compatibility.
-
-    Args:
-        key: 32-byte encryption key
-        name: Algorithm name for registration
-
-    Returns:
-        Notebook-compatible algorithm instance
-    """
-    from lib.algorithms import Aes256GcmAlgorithm
-
-    return adapt(Aes256GcmAlgorithm, key, name=name)

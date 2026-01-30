@@ -111,6 +111,7 @@ Declarative API for rapid algorithm prototyping in Jupyter notebooks.
 - `@with_password(password, salt)` — Derive key from password via `DerivedKeyProvider`
 - `@with_env_key(env_var)` — Load key from environment variable
 - `@with_metrics()` — Enable detailed metrics collection (timestamps, detailed flag)
+- `@with_memory_profiling()` — Enable memory profiling via `tracemalloc` (opt-in, adds overhead)
 
 **AlgorithmContext (`ctx`)** injected into encrypt/decrypt:
 - `ctx.key` — Key bytes from provider
@@ -131,7 +132,14 @@ Declarative API for rapid algorithm prototyping in Jupyter notebooks.
 
 **ReportBuilder** (`report.py`) generates styled output for Jupyter notebooks using `rich` tables, HTML, or plain text via `tabulate`.
 
-**Adapters** (`adapters.py`) bridge `lib/algorithms` to the notebook API. For example, `wrap_aes256gcm(key)` wraps the production AES-256-GCM implementation for use with `ComposerSession`.
+**Adapters** (`adapters.py`) bridge `lib/algorithms` to the notebook API via the generic `adapt()` factory:
+```python
+from lib.notebook import adapt
+from lib.algorithms import Aes256GcmAlgorithm
+
+algo = adapt(Aes256GcmAlgorithm, key, name="AES-256-GCM", profile_memory=True)
+```
+`adapt()` accepts `profile_memory` and `collect_metrics` flags to enable the full decorator stack on production algorithms.
 
 **Utilities** (`utils.py`): `generate_key()`, `generate_salt()`, `quick_test()`, `benchmark()`
 

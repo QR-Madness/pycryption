@@ -24,6 +24,7 @@ from lib.notebook.decorators import (
     with_password,
     with_env_key,
     with_metrics,
+    with_memory_profiling,
 )
 
 # Composer
@@ -44,10 +45,7 @@ from lib.notebook.utils import (
 from lib.notebook.report import ReportBuilder
 
 # Adapters for lib/algorithms
-from lib.notebook.adapters import (
-    adapt,
-    wrap_aes256gcm,
-)
+from lib.notebook.adapters import adapt
 
 # Re-export key providers for convenience
 from lib.util.kms.providers import (
@@ -71,6 +69,7 @@ __all__ = [
     "with_password",
     "with_env_key",
     "with_metrics",
+    "with_memory_profiling",
     # Composer
     "ComposerSession",
     "AlgorithmMetrics",
@@ -90,5 +89,4 @@ __all__ = [
     "ReportBuilder",
     # Adapters
     "adapt",
-    "wrap_aes256gcm",
 ]

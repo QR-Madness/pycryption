@@ -123,6 +123,61 @@ class TestAlgorithmDecorator:
         assert b._config.name == "Algo"
 
 
+class TestExpansionRatio:
+    def test_expansion_ratio_in_encrypt_metrics(self, key: bytes) -> None:
+        @algorithm("Expander")
+        @with_key(key)
+        class Algo:
+            def encrypt(self, data: bytes, ctx) -> bytes:
+                return data + b"tag123"  # simulates auth tag
+
+            def decrypt(self, data: bytes, ctx) -> bytes:
+                return data[:-6]
+
+        result = Algo().encrypt(b"hello")
+        assert "expansion_ratio" in result.metrics
+        assert result.metrics["expansion_ratio"] == round(11 / 5, 4)
+
+    def test_no_expansion_ratio_in_decrypt(self, key: bytes) -> None:
+        @algorithm("NoExpand")
+        @with_key(key)
+        class Algo:
+            def encrypt(self, data: bytes, ctx) -> bytes:
+                return data
+
+            def decrypt(self, data: bytes, ctx) -> bytes:
+                return data
+
+        result = Algo().decrypt(b"hello")
+        assert "expansion_ratio" not in result.metrics
+
+    def test_expansion_ratio_one_for_no_overhead(self, key: bytes) -> None:
+        @algorithm("NoOverhead")
+        @with_key(key)
+        class Algo:
+            def encrypt(self, data: bytes, ctx) -> bytes:
+                return data  # same size
+
+            def decrypt(self, data: bytes, ctx) -> bytes:
+                return data
+
+        result = Algo().encrypt(b"hello")
+        assert result.metrics["expansion_ratio"] == 1.0
+
+    def test_no_expansion_ratio_for_empty_input(self, key: bytes) -> None:
+        @algorithm("EmptyInput")
+        @with_key(key)
+        class Algo:
+            def encrypt(self, data: bytes, ctx) -> bytes:
+                return b"something"
+
+            def decrypt(self, data: bytes, ctx) -> bytes:
+                return data
+
+        result = Algo().encrypt(b"")
+        assert "expansion_ratio" not in result.metrics
+
+
 class TestWithKey:
     def test_injects_raw_bytes(self) -> None:
         key = os.urandom(32)
