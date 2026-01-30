@@ -6,16 +6,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 PyCryption is an **encryption research repository** for demonstrating algorithms, production mechanisms, and prototype designs while collecting benchmarks. The goal is to reduce cognitive overhead when testing implementable encryption patterns, prototype algorithms, and KDF designs.
 
-The core abstraction is **encryption composers** - specialized harnesses that wrap encryption algorithms with automatic metrics collection. Supports both traditional cryptography (`cryptography` library) and post-quantum cryptography (`pqcrypto`).
+The core abstraction is **encryption composers** — specialized harnesses that wrap encryption algorithms with automatic metrics collection. Supports both traditional cryptography (`cryptography` library) and post-quantum cryptography (`pqcrypto`).
 
-## Testing Philosophy
+## Requirements
 
-Tests ensure all components work and are traceable in failures. Given the sensitive nature of cryptographic research, test coverage is critical for validating correctness and catching regressions in algorithm implementations.
+- Python 3.10+
+- [uv](https://github.com/astral-sh/uv) package manager
 
 ## Commands
 
 ```bash
-# Install dependencies (uses uv package manager)
+# Install dependencies
 uv sync
 
 # Run all tests
@@ -31,18 +32,22 @@ python -m pytest lib/tests/test_file.py::TestClass::test_method
 jupyter notebook
 ```
 
+## Testing Philosophy
+
+Tests ensure all components work and are traceable in failures. Given the sensitive nature of cryptographic research, test coverage is critical for validating correctness and catching regressions in algorithm implementations.
+
 ## Architecture
 
 ### Core Components
 
-- **`lib/EncryptionAlgorithm.py`**: Base class and Input/Output types for all algorithms
+- **`lib/EncryptionAlgorithm.py`**: Base class and Input/Output types for all algorithms. Defines `SIMPLE_COMPOSER_TYPE` and `MULTI_COMPOSER_TYPE` constants.
 - **`lib/algorithms/`**: Production-ready algorithm implementations (e.g., `Aes256GcmAlgorithm`)
 - **`lib/notebook/`**: Declarative API for rapid prototyping in Jupyter notebooks
 - **`lib/util/kms/`**: Key management via KeyProvider pattern
 
-### Creating New Algorithms
+### Two Pathways for Algorithm Creation
 
-**Option 1: Using the Notebook API (recommended for prototyping)**
+**Option 1: Notebook API (recommended for prototyping)**
 
 ```python
 from lib.notebook import algorithm, with_key, generate_key
@@ -89,56 +94,47 @@ algo = create_aes256gcm_from_password(password, salt)
 ```
 
 **Available Providers:**
-- `LocalKeyProvider` - In-memory key (testing/development)
-- `EnvKeyProvider` - Key from environment variable (containers/CI)
-- `DerivedKeyProvider` - KDF from password (PBKDF2, scrypt)
-- `KmsKeyProvider` - External KMS integration (extend for AWS/GCP/Azure)
+- `LocalKeyProvider` — In-memory key (testing/development)
+- `EnvKeyProvider` — Key from environment variable (containers/CI)
+- `DerivedKeyProvider` — KDF from password (PBKDF2 with 480k iterations, scrypt)
+- `KmsKeyProvider` — External KMS integration (extend for AWS/GCP/Azure)
 
 **Method Decorator:** Use `@inject_key(key_length=32)` on encrypt/decrypt to auto-inject keys.
 
 ### Notebook API (`lib/notebook/`)
 
-Declarative API for rapid algorithm prototyping in Jupyter notebooks:
+Declarative API for rapid algorithm prototyping in Jupyter notebooks.
 
-- `context.py` - AlgorithmConfig, AlgorithmContext, AlgorithmResult, ContextRegistry
-- `decorators.py` - @algorithm, @with_key, @with_kdf, @with_salt, etc.
-- `composer.py` - ComposerSession, AlgorithmMetrics
-- `utils.py` - generate_key, generate_salt, quick_test, benchmark
-- `adapters.py` - Bridges lib/algorithms to notebook API (e.g., `wrap_aes256gcm`)
-
-**Decorators** handle logistics (key injection, context, metrics):
-- `@algorithm(name)` - Base decorator, wraps class with context injection
-- `@with_key(key)` - Inject raw key or KeyProvider
-- `@with_password(password, salt)` - Derive key from password
-- `@with_env_key(env_var)` - Load key from environment variable
-- `@with_kdf(name, func)` - Register a named KDF function
-- `@with_salt(name, salt)` - Register a named salt (auto-generates if not provided)
-- `@with_metrics()` - Enable detailed metrics collection
+**Class decorators** handle logistics (key injection, context, metrics):
+- `@algorithm(name)` — Base decorator, wraps class with context injection and `AlgorithmResult` return types
+- `@with_key(key)` — Inject raw key bytes or a `KeyProvider` instance
+- `@with_password(password, salt)` — Derive key from password via `DerivedKeyProvider`
+- `@with_env_key(env_var)` — Load key from environment variable
+- `@with_metrics()` — Enable detailed metrics collection (timestamps, detailed flag)
 
 **AlgorithmContext (`ctx`)** injected into encrypt/decrypt:
-- `ctx.key` - Key bytes from provider
-- `ctx.nonce` - Auto-generated nonce
-- `ctx.metrics` - Dict for collecting metrics
-- `ctx.elapsed_ms()` - Timing helper
-- `ctx.registry` - Access to named KDFs, salts, and layer materials
-- `ctx.derive(kdf_name, salt_name)` - Derive key using registered KDF and salt
-- `ctx.layer(name)` - Access named layer materials for multi-layer encryption
+- `ctx.key` — Key bytes from provider
+- `ctx.metrics` — Dict for collecting metrics
+- `ctx.elapsed_ms()` — Timing helper
+- `ctx.registry` — Access the `CryptoRegistry` for all cryptographic materials
+- `ctx.derive(kdf_name, salt_name)` — Derive key using registered KDF and salt
+- `ctx.set_nonce(name)` / `ctx.get_nonce(name)` — Nonce management via registry
+- `ctx.set_salt(name)` / `ctx.get_salt(name)` — Salt management via registry
 
-**ComposerSession** for benchmarking prototypes against lib/algorithms:
-- `register()` - Register algorithm instances
-- `test_all()` - Round-trip verification
-- `benchmark_all()` - Performance benchmarks
-- `compare()` - Side-by-side comparison (sorted by speed)
+**CryptoRegistry** (`context.py`) is the single source of truth for all cryptographic materials. It persists across encrypt/decrypt calls on an instance and stores: keys, salts, nonces, derived keys, shared secrets, KDF functions, and encapsulation/decapsulation functions (for PQ/KEM algorithms like Kyber).
 
-### Notebooks
+**ComposerSession** (`composer.py`) for benchmarking prototypes against production algorithms:
+- `register()` — Register algorithm instances
+- `test_all()` — Round-trip verification
+- `benchmark_all()` — Performance benchmarks
+- `compare()` — Side-by-side comparison (sorted by speed)
 
-Interactive experimentation via Jupyter notebooks:
-- `Symmetric.ipynb` - Symmetric encryption benchmarks
-- `Asymmetric.ipynb` - Asymmetric encryption examples
-- `KYBER.ipynb` - Post-quantum key encapsulation
-- `Encryption Composer.ipynb` - Composer usage examples
-- `General Cryptography.ipynb` - General cryptographic concepts
+**ReportBuilder** (`report.py`) generates styled output for Jupyter notebooks using `rich` tables, HTML, or plain text via `tabulate`.
+
+**Adapters** (`adapters.py`) bridge `lib/algorithms` to the notebook API. For example, `wrap_aes256gcm(key)` wraps the production AES-256-GCM implementation for use with `ComposerSession`.
+
+**Utilities** (`utils.py`): `generate_key()`, `generate_salt()`, `quick_test()`, `benchmark()`
 
 ## Security
 
-Run Snyk security scans on new code. Fix any issues found before committing.
+Run Snyk security scans on new first-party code. Fix any issues found, rescan, and repeat until clean before committing.
