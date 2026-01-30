@@ -78,6 +78,28 @@
 
 ---
 
+## Comprehensive Algorithm Analysis
+
+### CPU Measurement
+- [ ] Add `cpu_time_ms` via `time.process_time()` — actual CPU work excluding sleep/IO
+- [ ] Add CPU efficiency ratio (`cpu_time / wall_time`) — indicates CPU-bound vs IO-bound
+
+### Output Quality Analysis
+- [ ] Shannon entropy of ciphertext (bits/byte, ideal ~8.0 for good ciphers)
+- [ ] Byte frequency distribution with chi-squared uniformity test
+- [ ] Avalanche effect — flip 1 bit in plaintext, measure % of ciphertext bits changed (ideal ~50%)
+- [ ] Key sensitivity — flip 1 bit in key, measure % of ciphertext bits changed (ideal ~50%)
+- [ ] Pattern detection — repeated ciphertext blocks, autocorrelation (ECB mode red flag)
+
+### Throughput
+- [ ] Add MB/sec throughput metric alongside ops/sec (standard in OpenSSL/libsodium benchmarks)
+
+### Timing Consistency
+- [ ] Coefficient of variation (stddev/mean) — flags potential timing side-channels
+- [ ] Timing variance by input content — constant-time implementations should show low CV regardless of data
+
+---
+
 ## Utilities
 
 - [ ] Expand `DataGenerator` with binary data generation (not just ASCII)
