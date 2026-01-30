@@ -12,7 +12,6 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, Optional, Union
 
-from lib.EncryptionAlgorithm import SIMPLE_COMPOSER_TYPE
 from lib.util.kms.providers import KeyProvider
 
 # Type aliases
@@ -193,7 +192,6 @@ class AlgorithmConfig:
     Stored as a class attribute and copied to instances.
     """
     name: str = "Unnamed"
-    composer_type: str = SIMPLE_COMPOSER_TYPE
     key_provider: Optional[KeyProvider] = None
     collect_metrics: bool = False
     context_modifiers: list = field(default_factory=list)
@@ -202,7 +200,6 @@ class AlgorithmConfig:
         """Create a copy for instance-level isolation."""
         return AlgorithmConfig(
             name=self.name,
-            composer_type=self.composer_type,
             key_provider=self.key_provider,
             collect_metrics=self.collect_metrics,
             context_modifiers=list(self.context_modifiers),

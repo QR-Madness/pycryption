@@ -45,6 +45,7 @@ from lib.notebook.report import ReportBuilder
 
 # Adapters for lib/algorithms
 from lib.notebook.adapters import (
+    adapt,
     wrap_aes256gcm,
 )
 
@@ -56,12 +57,6 @@ from lib.util.kms.providers import (
     DerivedKeyProvider,
     KmsKeyProvider,
     KeyProviderError,
-)
-
-# Re-export composer types
-from lib.EncryptionAlgorithm import (
-    SIMPLE_COMPOSER_TYPE,
-    MULTI_COMPOSER_TYPE,
 )
 
 __all__ = [
@@ -94,8 +89,6 @@ __all__ = [
     # Report builder
     "ReportBuilder",
     # Adapters
+    "adapt",
     "wrap_aes256gcm",
-    # Constants
-    "SIMPLE_COMPOSER_TYPE",
-    "MULTI_COMPOSER_TYPE",
 ]

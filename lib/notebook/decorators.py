@@ -11,7 +11,6 @@ import time
 from functools import wraps
 from typing import Any, Callable, Optional, Type, TypeVar, Union
 
-from lib.EncryptionAlgorithm import SIMPLE_COMPOSER_TYPE
 from lib.notebook.context import (
     AlgorithmConfig,
     AlgorithmContext,
@@ -77,10 +76,7 @@ def _build_context(instance: Any, operation: str) -> AlgorithmContext:
 # -----------------------------------------------------------------------------
 
 
-def algorithm(
-        name: str,
-        composer_type: str = SIMPLE_COMPOSER_TYPE,
-) -> Callable[[Type[T]], Type[T]]:
+def algorithm(name: str) -> Callable[[Type[T]], Type[T]]:
     """
     Class decorator that transforms a class into a managed algorithm.
 
@@ -91,7 +87,6 @@ def algorithm(
     def decorator(cls: Type[T]) -> Type[T]:
         config = _ensure_config(cls)
         config.name = name
-        config.composer_type = composer_type
 
         original_init = cls.__init__ if hasattr(cls, "__init__") else None
 
