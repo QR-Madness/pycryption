@@ -175,21 +175,23 @@ class ComposerSession:
         name: str,
         data_sizes: Optional[list[int]] = None,
         iterations: int = 10,
+        seed: Optional[Any] = None,
     ) -> Dict[str, Any]:
         """Benchmark a specific algorithm across data sizes."""
         from lib.notebook.utils import benchmark as run_benchmark
 
         algo = self.get(name)
-        return run_benchmark(algo, data_sizes=data_sizes, iterations=iterations)
+        return run_benchmark(algo, data_sizes=data_sizes, iterations=iterations, seed=seed)
 
     def benchmark_all(
         self,
         data_sizes: Optional[list[int]] = None,
         iterations: int = 10,
+        seed: Optional[Any] = None,
     ) -> Dict[str, Dict[str, Any]]:
-        """Benchmark all registered algorithms."""
+        """Benchmark all registered algorithms (same seed = same payloads for all)."""
         return {
-            name: self.benchmark(name, data_sizes=data_sizes, iterations=iterations)
+            name: self.benchmark(name, data_sizes=data_sizes, iterations=iterations, seed=seed)
             for name in self._algorithms
         }
 

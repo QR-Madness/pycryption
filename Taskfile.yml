@@ -37,6 +37,21 @@ tasks:
     cmds:
       - '{{.PY}} scripts/ride.py --analyze'
 
+  bench:save:
+    desc: Persist a seeded benchmark run to benchmarks/ (label after --)
+    cmds:
+      - '{{.PY}} scripts/ride.py --save {{.CLI_ARGS}}'
+
+  bench:list:
+    desc: List saved benchmark runs
+    cmds:
+      - '{{.PY}} scripts/bench.py list'
+
+  bench:diff:
+    desc: Throughput delta between the latest two saved runs
+    cmds:
+      - '{{.PY}} scripts/bench.py diff {{.CLI_ARGS}}'
+
   nb:exec:
     desc: Re-execute notebooks in place, refreshing committed outputs (pass paths after --)
     cmds:

@@ -37,6 +37,19 @@ def main() -> int:
         action="store_true",
         help="also run the output quality panel (entropy, avalanche, ECB canary)",
     )
+    parser.add_argument(
+        "--save",
+        nargs="?",
+        const="",
+        default=None,
+        metavar="LABEL",
+        help="persist a seeded benchmark run to benchmarks/ (optional label)",
+    )
+    parser.add_argument(
+        "--seed",
+        default="pycryption",
+        help="payload seed for saved runs (default: pycryption)",
+    )
     args = parser.parse_args()
 
     key = os.urandom(32)
@@ -69,6 +82,24 @@ def main() -> int:
     if args.analyze:
         report.heading("Output Quality Analysis", level=2)
         report.analysis_table(session.analyze_all())
+
+    if args.save is not None:
+        from lib.notebook import save_benchmark_run
+
+        report.heading("Persisting Benchmark Run", level=2)
+        benchmarks = session.benchmark_all(
+            data_sizes=[100, 1_000, 10_000, 100_000],
+            iterations=args.iterations,
+            seed=args.seed,
+        )
+        path = save_benchmark_run(
+            benchmarks,
+            label=args.save or None,
+            seed=args.seed,
+            iterations=args.iterations,
+            analysis=session.analyze_all(),
+        )
+        report.success(f"Saved {path}")
 
     return 0
 

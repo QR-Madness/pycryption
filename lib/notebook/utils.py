@@ -7,8 +7,9 @@ Provides key generation, quick testing, and benchmarking helpers.
 from __future__ import annotations
 
 import os
+import random
 import statistics as _stats
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 
 def generate_key(size: int = 32) -> bytes:
@@ -82,6 +83,7 @@ def benchmark(
     algo_instance: Any,
     data_sizes: Optional[list[int]] = None,
     iterations: int = 10,
+    seed: Optional[Union[int, str, bytes]] = None,
 ) -> Dict[str, Any]:
     """
     Benchmark an algorithm across various data sizes.
@@ -89,6 +91,9 @@ def benchmark(
     Returns dict with algorithm name, iteration count, and
     per-size benchmark results including timing, throughput,
     statistical metrics, and optional memory profiling data.
+
+    Pass *seed* to use deterministic payloads (derived per size) so runs
+    are comparable across time and machines.
     """
     if data_sizes is None:
         data_sizes = [100, 1000, 10000, 100000]
@@ -101,9 +106,14 @@ def benchmark(
         "iterations": iterations,
         "benchmarks": [],
     }
+    if seed is not None:
+        results["seed"] = str(seed)
 
     for size in data_sizes:
-        data = os.urandom(size)
+        if seed is not None:
+            data = random.Random(f"{seed}:{size}").randbytes(size)
+        else:
+            data = os.urandom(size)
         encrypt_times: list[float] = []
         decrypt_times: list[float] = []
         encrypt_memory: list[int] = []

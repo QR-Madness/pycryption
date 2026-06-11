@@ -162,12 +162,18 @@ rich notebooks, exercises, and a cryptography on-ramp mathematics track.
       `task nb:exec`, `task nb:check`, `task site:*` (quarto-gated), `task clean`
 - [x] `scripts/ride.py` — specimen benchmarks from the terminal, no IDE needed
 - [x] `scripts/exec_notebooks.py` — headless notebook execution (in-place or --check)
-- [ ] Wire `task bench:save` once benchmark persistence lands (JSON keyed by
-      commit/machine)
+- [x] Benchmark persistence (`lib/notebook/persistence.py`): stamped JSON
+      records in `benchmarks/` (commit + dirty flag, machine fingerprint,
+      UTC timestamp, seed, optional analysis panel); `task bench:save`,
+      `task bench:list`, `task bench:diff` (throughput deltas between runs)
+- [ ] Surface saved runs on the site (benchmarks page fed from
+      `benchmarks/*.json`)
 
 ---
 
 ## Utilities
 
-- [ ] Expand `DataGenerator` with binary data generation (not just ASCII)
-- [ ] Add deterministic seeded generation for reproducible benchmarks
+- [x] Expand `DataGenerator` with binary data generation (not just ASCII)
+- [x] Add deterministic seeded generation for reproducible benchmarks
+      (`seed` on DataGenerator, `benchmark()`, and ComposerSession
+      benchmark/benchmark_all — per-size payloads derived from the seed)

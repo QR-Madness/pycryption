@@ -51,6 +51,14 @@ from lib.notebook.analysis import (
     shannon_entropy,
 )
 
+# Benchmark persistence
+from lib.notebook.persistence import (
+    compare_runs,
+    latest_run,
+    load_runs,
+    save_benchmark_run,
+)
+
 # Report builder
 from lib.notebook.report import ReportBuilder
 
@@ -102,6 +110,11 @@ __all__ = [
     "chi_squared_uniformity",
     "ecb_canary",
     "shannon_entropy",
+    # Benchmark persistence
+    "compare_runs",
+    "latest_run",
+    "load_runs",
+    "save_benchmark_run",
     # Report builder
     "ReportBuilder",
     # Adapters

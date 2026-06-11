@@ -43,6 +43,9 @@ task ride       # benchmark the specimen shelf in the terminal
 task ride:full  # include scaling analysis
 task nb:check   # execute notebooks headlessly without writing outputs
 task nb:exec    # re-execute notebooks, refreshing committed outputs
+task analyze    # output quality panel (entropy, avalanche, ECB canary)
+task bench:save # persist a seeded, commit-stamped benchmark run
+task bench:diff # throughput delta between the latest two saved runs
 ```
 
 ## Notebooks
