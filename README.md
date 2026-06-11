@@ -32,6 +32,19 @@ python -m pytest lib/tests/
 jupyter notebook
 ```
 
+## Lab Ops
+
+Day-to-day operations run through [Task](https://taskfile.dev) — no IDE required:
+
+```bash
+task            # list all lab tasks
+task test       # full test suite
+task ride       # benchmark the specimen shelf in the terminal
+task ride:full  # include scaling analysis
+task nb:check   # execute notebooks headlessly without writing outputs
+task nb:exec    # re-execute notebooks, refreshing committed outputs
+```
+
 ## Notebooks
 
 - `Symmetric.ipynb` - Symmetric encryption benchmarks

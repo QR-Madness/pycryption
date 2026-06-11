@@ -1,0 +1,65 @@
+# Lab office front desk — `task --list` to see everything.
+# https://taskfile.dev (go-task)
+version: '3'
+
+vars:
+  PY: .venv/bin/python
+
+tasks:
+  default:
+    desc: List all lab tasks
+    silent: true
+    cmds:
+      - task --list
+
+  sync:
+    desc: Install/sync dependencies via uv
+    cmds:
+      - uv sync
+
+  test:
+    desc: Run the full test suite
+    cmds:
+      - '{{.PY}} -m pytest lib/tests/ {{.CLI_ARGS}}'
+
+  ride:
+    desc: Benchmark the specimen shelf in the terminal (pass flags after --)
+    cmds:
+      - '{{.PY}} scripts/ride.py {{.CLI_ARGS}}'
+
+  ride:full:
+    desc: Specimen ride including scaling analysis
+    cmds:
+      - '{{.PY}} scripts/ride.py --scaling'
+
+  nb:exec:
+    desc: Re-execute notebooks in place, refreshing committed outputs (pass paths after --)
+    cmds:
+      - '{{.PY}} scripts/exec_notebooks.py {{.CLI_ARGS}}'
+
+  nb:check:
+    desc: Execute notebooks without writing outputs (CI smoke test)
+    cmds:
+      - '{{.PY}} scripts/exec_notebooks.py --check {{.CLI_ARGS}}'
+
+  site:preview:
+    desc: Live-preview the lab site (requires quarto — see Todo.md "Lab Office")
+    preconditions:
+      - sh: command -v quarto
+        msg: "quarto not installed: https://quarto.org/docs/get-started/"
+    cmds:
+      - quarto preview
+
+  site:build:
+    desc: Build the lab site to _site/
+    preconditions:
+      - sh: command -v quarto
+        msg: "quarto not installed: https://quarto.org/docs/get-started/"
+    cmds:
+      - quarto render
+
+  clean:
+    desc: Remove caches and build artifacts
+    cmds:
+      - rm -rf .pytest_cache _site .quarto
+      - find . -path ./.venv -prune -o -name __pycache__ -type d -print0 | xargs -0 rm -rf

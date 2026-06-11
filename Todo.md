@@ -76,7 +76,7 @@
 
 ---
 
-## Comprehensive Algorithm Analysis
+## Comprehensive Algorithm Analysis — NEXT UP (output QA suite)
 
 ### CPU Measurement
 - [ ] Add `cpu_time_ms` via `time.process_time()` — actual CPU work excluding sleep/IO
@@ -97,14 +97,57 @@
 - [ ] Timing variance by input content — constant-time implementations should show low CV regardless of data
 
 
-## Full Site-Integration
+## Lab Office (Site)
 
-### Jupyter Book Setup
-- [ ] Install JupyterBook dependency
-- [ ] 
+Goal: serve the notebooks as a crisp, low-maintenance site, with room for
+rich notebooks, exercises, and a cryptography on-ramp mathematics track.
 
-### Initial Document Structure
-- [ ] 
+### Stack Decision
+- [ ] Pin the stack — **Quarto recommended**: renders committed `.ipynb`
+      outputs without re-executing (friendliest to our outputs-in-git
+      convention), single binary + one `_quarto.yml`, native KaTeX for the
+      math track, ANSI-aware output rendering for `rich` tables
+- [ ] Runner-up: MyST/Jupyter Book 2 (exercise/proof directives are strong
+      for course content) — revisit if Quarto theming disappoints
+- [ ] Next.js/Vite assessment: notebooks become second-class (own the
+      ipynb→MDX pipeline, ANSI, math, highlighting); only worth it if the
+      site becomes a product. Keep notebooks canonical so migration stays
+      possible later.
+
+### Candidate A — Root Project (start here)
+- [ ] `_quarto.yml` at repo root; notebooks stay where they are, listed as
+      render targets — zero import breakage, minimal churn
+- [ ] Index page: lab overview + latest specimen comparison
+- [ ] Theme pass: dark/light, output styling; use ReportBuilder HTML mode
+      where rich-table ANSI renders poorly
+
+### Candidate B — Lab Wings (graduate when on-ramp content lands)
+- [ ] Reorganize content into `specimens/`, `composer/`, `on-ramp/`,
+      `exercises/` directories with section navigation
+- [ ] Fix `from lib...` imports for relocated notebooks (execute from repo
+      root — `exec_notebooks.py` already pins kernel cwd to root)
+
+### On-Ramp Mathematics
+- [ ] Outline curriculum: modular arithmetic → groups/rings/fields →
+      discrete log & factoring → elliptic curves → lattices (LWE → ML-KEM)
+- [ ] Exercise format: callouts with collapsible solutions; evaluate
+      quarto-live (Pyodide) for in-browser exercises
+- [ ] First chapter: modular arithmetic, tied into the XOR/Caesar specimens
+
+### Publishing
+- [ ] GitHub Actions: `task nb:check` smoke test on push
+- [ ] Render + publish site to GitHub Pages on master
+
+---
+
+## Lab Ops
+
+- [x] `Taskfile.yml` front desk: `task test`, `task ride`, `task ride:full`,
+      `task nb:exec`, `task nb:check`, `task site:*` (quarto-gated), `task clean`
+- [x] `scripts/ride.py` — specimen benchmarks from the terminal, no IDE needed
+- [x] `scripts/exec_notebooks.py` — headless notebook execution (in-place or --check)
+- [ ] Wire `task bench:save` once benchmark persistence lands (JSON keyed by
+      commit/machine)
 
 ---
 
