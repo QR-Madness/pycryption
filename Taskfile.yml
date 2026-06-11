@@ -28,9 +28,14 @@ tasks:
       - '{{.PY}} scripts/ride.py {{.CLI_ARGS}}'
 
   ride:full:
-    desc: Specimen ride including scaling analysis
+    desc: Specimen ride including scaling and output quality analysis
     cmds:
-      - '{{.PY}} scripts/ride.py --scaling'
+      - '{{.PY}} scripts/ride.py --scaling --analyze'
+
+  analyze:
+    desc: Output quality panel only (entropy, avalanche, ECB canary)
+    cmds:
+      - '{{.PY}} scripts/ride.py --analyze'
 
   nb:exec:
     desc: Re-execute notebooks in place, refreshing committed outputs (pass paths after --)

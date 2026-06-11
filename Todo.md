@@ -76,21 +76,32 @@
 
 ---
 
-## Comprehensive Algorithm Analysis — NEXT UP (output QA suite)
+## Comprehensive Algorithm Analysis
 
 ### CPU Measurement
 - [ ] Add `cpu_time_ms` via `time.process_time()` — actual CPU work excluding sleep/IO
 - [ ] Add CPU efficiency ratio (`cpu_time / wall_time`) — indicates CPU-bound vs IO-bound
 
-### Output Quality Analysis
-- [ ] Shannon entropy of ciphertext (bits/byte, ideal ~8.0 for good ciphers)
-- [ ] Byte frequency distribution with chi-squared uniformity test
-- [ ] Avalanche effect — flip 1 bit in plaintext, measure % of ciphertext bits changed (ideal ~50%)
-- [ ] Key sensitivity — flip 1 bit in key, measure % of ciphertext bits changed (ideal ~50%)
-- [ ] Pattern detection — repeated ciphertext blocks, autocorrelation (ECB mode red flag)
+### Output Quality Analysis (`lib/notebook/analysis.py`)
+- [x] Shannon entropy of ciphertext, with sample-size-aware flagging
+      threshold (`min_expected_entropy` — Miller-Madow bias × 4 margin)
+- [x] Byte frequency chi-squared uniformity test (no scipy: fixed critical
+      values, α=0.05 reported, α=0.001 for flagging)
+- [x] Avalanche effect — flip 1 plaintext bit, measure % ciphertext bits
+      changed; low scores expose diffusion-free designs (XOR ≈ 0.02%),
+      randomized ciphers pass trivially by construction
+- [ ] Key sensitivity — flip 1 bit in key, measure % of ciphertext bits
+      changed; needs a generic re-keying hook on adapted/decorated
+      instances (key lives in provider/config, not per-call)
+- [x] Pattern detection — ECB canary: repeated ciphertext blocks under
+      repetitive plaintext (catches AES-ECB: 63/63 duplicates)
+- [x] `ComposerSession.analyze()` / `analyze_all()` (probes bypass session
+      metrics), `ReportBuilder.analysis_table()`, `task analyze`,
+      `task ride:full --analyze`
 
 ### Throughput
-- [ ] Add MB/sec throughput metric alongside ops/sec (standard in OpenSSL/libsodium benchmarks)
+- [x] MB/sec throughput metric alongside ops/sec (in `compare()` /
+      comparison table)
 
 ### Timing Consistency
 - [ ] Coefficient of variation (stddev/mean) — flags potential timing side-channels

@@ -451,6 +451,73 @@ class ReportBuilder:
             ]
             self.table(data, columns=["algorithm", "status"], title=title)
 
+    def analysis_table(
+        self,
+        results: Dict[str, Dict[str, Any]],
+        title: str = "Output Quality Analysis",
+    ) -> None:
+        """
+        Render output-quality results from ComposerSession.analyze_all().
+
+        Args:
+            results: Dict mapping algorithm names to analyze() panels
+            title: Table title
+        """
+        if not results:
+            print("(no data)")
+            return
+
+        if self.format == "rich":
+            colors = self._get_theme_colors()
+            table = Table(title=title, border_style=colors["border"])
+            table.add_column("Algorithm", style=colors["header"])
+            table.add_column("Entropy (bits/B)", justify="right")
+            table.add_column("χ² (crit 293.2)", justify="right")
+            table.add_column("Avalanche %", justify="right")
+            table.add_column("ECB Dups", justify="right")
+            table.add_column("Verdict", justify="center")
+
+            for name, panel in results.items():
+                if "error" in panel:
+                    table.add_row(name, "-", "-", "-", "-", Text("✗ ERROR", style="bold red"))
+                    continue
+                flags = panel["flags"]
+                verdict = (
+                    Text("✓ CLEAN", style="bold green")
+                    if not flags
+                    else Text("⚠ " + ", ".join(flags), style="bold red")
+                )
+                table.add_row(
+                    name,
+                    f"{panel['entropy_bits_per_byte']:.4f}",
+                    f"{panel['chi2_statistic']:.1f}",
+                    f"{panel['avalanche_pct']:.2f}",
+                    str(panel["ecb_duplicate_blocks"]),
+                    verdict,
+                )
+
+            self._console.print(table)
+        else:
+            data = []
+            for name, panel in results.items():
+                row: Dict[str, Any] = {"algorithm": name}
+                if "error" in panel:
+                    row["verdict"] = "ERROR"
+                else:
+                    row.update(
+                        entropy=panel["entropy_bits_per_byte"],
+                        chi2=panel["chi2_statistic"],
+                        avalanche_pct=panel["avalanche_pct"],
+                        ecb_duplicates=panel["ecb_duplicate_blocks"],
+                        verdict="CLEAN" if not panel["flags"] else ", ".join(panel["flags"]),
+                    )
+                data.append(row)
+            self.table(
+                data,
+                columns=["algorithm", "entropy", "chi2", "avalanche_pct", "ecb_duplicates", "verdict"],
+                title=title,
+            )
+
     def heading(self, text: str, level: int = 1) -> None:
         """Print a styled heading."""
         if self.format == "rich":

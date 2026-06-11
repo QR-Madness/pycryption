@@ -41,6 +41,16 @@ from lib.notebook.utils import (
     benchmark,
 )
 
+# Output quality analysis
+from lib.notebook.analysis import (
+    analyze_output,
+    avalanche_effect,
+    bit_difference_ratio,
+    chi_squared_uniformity,
+    ecb_canary,
+    shannon_entropy,
+)
+
 # Report builder
 from lib.notebook.report import ReportBuilder
 
@@ -85,6 +95,13 @@ __all__ = [
     "generate_salt",
     "quick_test",
     "benchmark",
+    # Output quality analysis
+    "analyze_output",
+    "avalanche_effect",
+    "bit_difference_ratio",
+    "chi_squared_uniformity",
+    "ecb_canary",
+    "shannon_entropy",
     # Report builder
     "ReportBuilder",
     # Adapters

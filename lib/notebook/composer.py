@@ -226,6 +226,29 @@ class ComposerSession:
         results.sort(key=lambda x: x["avg_encrypt_ms"])
         return results
 
+    def analyze(self, name: str, sample_size: int = 4096, trials: int = 16) -> Dict[str, Any]:
+        """
+        Run the output-quality panel (entropy, chi-squared uniformity,
+        avalanche, ECB canary) on the named algorithm.
+
+        Calls the algorithm directly rather than through session encrypt()
+        so analysis probes don't pollute aggregated performance metrics.
+        """
+        from lib.notebook.analysis import analyze_output
+
+        return analyze_output(self.get(name), sample_size=sample_size, trials=trials)
+
+    def analyze_all(
+        self,
+        sample_size: int = 4096,
+        trials: int = 16,
+    ) -> Dict[str, Dict[str, Any]]:
+        """Run the output-quality panel on all registered algorithms."""
+        return {
+            name: self.analyze(name, sample_size=sample_size, trials=trials)
+            for name in self._algorithms
+        }
+
     def report(self) -> Dict[str, Dict[str, Any]]:
         """Get aggregated metrics for all algorithms."""
         return {name: m.as_dict() for name, m in self._metrics.items()}

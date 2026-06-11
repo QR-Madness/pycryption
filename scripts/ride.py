@@ -32,6 +32,11 @@ def main() -> int:
         action="store_true",
         help="also run the scaling analysis (100 B - 100 KB)",
     )
+    parser.add_argument(
+        "--analyze",
+        action="store_true",
+        help="also run the output quality panel (entropy, avalanche, ECB canary)",
+    )
     args = parser.parse_args()
 
     key = os.urandom(32)
@@ -60,6 +65,10 @@ def main() -> int:
         report.benchmark_table(
             session.benchmark_all(data_sizes=[100, 1_000, 10_000, 100_000], iterations=20)
         )
+
+    if args.analyze:
+        report.heading("Output Quality Analysis", level=2)
+        report.analysis_table(session.analyze_all())
 
     return 0
 
