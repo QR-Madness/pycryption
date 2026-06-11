@@ -4,6 +4,9 @@ project:
   render:
     - index.qmd
     - benchmarks.qmd
+    - on-ramp/index.qmd
+    - on-ramp/01-modular-arithmetic.ipynb
+    - on-ramp/02-matrices-hill-cipher.ipynb
     - "General Cryptography.ipynb"
     - "Encryption Composer.ipynb"
     - Symmetric.ipynb
@@ -21,8 +24,16 @@ website:
     left:
       - href: index.qmd
         text: Front Desk
-      - href: "General Cryptography.ipynb"
-        text: On-Ramp
+      - text: On-Ramp
+        menu:
+          - href: on-ramp/index.qmd
+            text: Mathematics Track
+          - href: on-ramp/01-modular-arithmetic.ipynb
+            text: "Ch 1 — Modular Arithmetic"
+          - href: on-ramp/02-matrices-hill-cipher.ipynb
+            text: "Ch 2 — Matrices & the Hill Cipher"
+          - href: "General Cryptography.ipynb"
+            text: "Concepts: General Cryptography"
       - href: "Encryption Composer.ipynb"
         text: Composer Tutorial
       - text: Specimens

@@ -1,0 +1,48 @@
+---
+title: "On-Ramp Mathematics"
+subtitle: "The math under the specimens, one chapter at a time"
+toc: false
+---
+
+A cryptography mathematics track that starts from **high-school algebra** and
+climbs to the lattice problems inside the lab's post-quantum specimens. No
+proofs-for-proofs'-sake: every chapter builds working ciphers, then turns the
+lab's own analysis instruments on them — entropy, avalanche, the ECB canary —
+so the math's predictions get checked against measurements, in the same
+notebooks you can run yourself.
+
+The conceptual companion is the [General Cryptography](../General%20Cryptography.ipynb)
+tour: concepts there, mechanics here.
+
+## The Arc
+
+| # | Chapter | Status |
+|---|---------|--------|
+| 0 | Bits, Bytes & XOR (warm-up) | planned |
+| 1 | [**Modular Arithmetic**](01-modular-arithmetic.ipynb) | **open** |
+| 2 | [**Matrices & the Hill Cipher**](02-matrices-hill-cipher.ipynb) | **open** |
+| 3 | Groups, Rings & Finite Fields | planned |
+| 4 | Hard Problems: Discrete Log & Factoring | planned |
+| 5 | Elliptic Curves | planned |
+| 6 | Lattices & LWE → ML-KEM | planned |
+
+The destination is deliberate: Chapter 6 explains the mathematics inside
+[ML-KEM-768](../ML-KEM.ipynb) — a specimen you can already benchmark in this
+lab — and matrices (Chapter 2) are its direct prerequisite.
+
+## How the Chapters Work
+
+- **Prose + math first**, in small steps with concrete numbers before symbols.
+- **Every cipher becomes a lab specimen** via the `@algorithm` decorator, so
+  `quick_test` and `analyze_output` run against it like any production
+  algorithm. Watching the instruments convict the Hill cipher teaches more
+  than a paragraph ever could.
+- **Exercises** appear in callout boxes with collapsible solutions —
+  try before you peek. Each chapter ends with a *self-check cell* of
+  `assert`s you can run locally:
+
+```bash
+uv sync && jupyter notebook on-ramp/
+# or headless:
+task nb:check -- on-ramp/01-modular-arithmetic.ipynb
+```

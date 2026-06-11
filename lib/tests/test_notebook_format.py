@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
-NOTEBOOKS = sorted(REPO_ROOT.glob("*.ipynb"))
+NOTEBOOKS = sorted([*REPO_ROOT.glob("*.ipynb"), *REPO_ROOT.glob("on-ramp/*.ipynb")])
 
 
 @pytest.mark.parametrize("path", NOTEBOOKS, ids=lambda p: p.name)

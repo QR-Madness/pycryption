@@ -14,9 +14,10 @@ afternoon of scaffolding.
 :::: {.grid}
 
 ::: {.g-col-12 .g-col-md-6 .wing-card}
-### {{< fa road >}} [On-Ramp](General%20Cryptography.ipynb)
-Cryptography fundamentals, level by level — from XOR to KEMs. The
-mathematics track and exercises will grow here.
+### {{< fa road >}} [On-Ramp](on-ramp/index.qmd)
+The mathematics track is open: modular arithmetic and matrices/Hill cipher
+chapters with exercises, plus the level-by-level
+[concept tour](General%20Cryptography.ipynb) from XOR to KEMs.
 :::
 
 ::: {.g-col-12 .g-col-md-6 .wing-card}

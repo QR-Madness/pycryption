@@ -36,7 +36,7 @@ def main() -> int:
     paths = (
         [Path(p) for p in args.notebooks]
         if args.notebooks
-        else sorted(ROOT.glob("*.ipynb"))
+        else sorted([*ROOT.glob("*.ipynb"), *ROOT.glob("on-ramp/*.ipynb")])
     )
 
     failures: list[str] = []

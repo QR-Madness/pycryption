@@ -154,12 +154,24 @@ rich notebooks, exercises, and a cryptography on-ramp mathematics track.
 - [ ] Fix `from lib...` imports for relocated notebooks (execute from repo
       root — `exec_notebooks.py` already pins kernel cwd to root)
 
-### On-Ramp Mathematics
-- [ ] Outline curriculum: modular arithmetic → groups/rings/fields →
+### On-Ramp Mathematics (`on-ramp/`)
+- [x] Curriculum outlined (7-chapter arc on the track overview page):
+      bits/XOR → modular arithmetic → matrices/Hill → groups/fields →
       discrete log & factoring → elliptic curves → lattices (LWE → ML-KEM)
-- [ ] Exercise format: callouts with collapsible solutions; evaluate
-      quarto-live (Pyodide) for in-browser exercises
-- [ ] First chapter: modular arithmetic, tied into the XOR/Caesar specimens
+- [x] Exercise format: callout-note exercises with collapsible
+      callout-tip solutions + assert-based self-check cells (committed
+      outputs show them passing); quarto-live deferred
+- [x] Chapter 1 — Modular Arithmetic: congruences, extended Euclid,
+      inverses, Fermat; Caesar + affine ciphers as `@algorithm` specimens;
+      instruments confirm entropy invariance and ~0 avalanche
+- [x] Chapter 2 — Matrices & the Hill Cipher: matrix arithmetic mod n,
+      determinant invertibility, Hill as specimen, ECB-canary conviction,
+      known-plaintext key recovery; bridges to MixColumns and lattices
+- [ ] Chapter 0 — Bits, Bytes & XOR (warm-up)
+- [ ] Chapter 3 — Groups, Rings & Finite Fields
+- [ ] Chapter 4 — Hard Problems: Discrete Log & Factoring
+- [ ] Chapter 5 — Elliptic Curves
+- [ ] Chapter 6 — Lattices & LWE → ML-KEM
 
 ### Publishing
 - [ ] GitHub Actions: `task nb:check` smoke test on push
