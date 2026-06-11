@@ -30,7 +30,7 @@
 
 ---
 
-## Multi Composer - Baseline
+## Multi Encryption - Baseline
 
 ### Core Implementation
 - [ ] Implement `encrypt()` method to chain data through all layers sequentially
@@ -50,10 +50,6 @@
 - [ ] Add per-layer timing metrics
 - [ ] Add aggregate metrics across all layers
 - [ ] Create layered report structure showing each algorithm's contribution
-
-### Input/Output Types
-- [ ] Define `MultiEncryptionAlgorithmInput` fields
-- [ ] Define `MultiEncryptionAlgorithmOutput` fields with layer metadata
 
 ---
 
@@ -97,6 +93,16 @@
 ### Timing Consistency
 - [ ] Coefficient of variation (stddev/mean) — flags potential timing side-channels
 - [ ] Timing variance by input content — constant-time implementations should show low CV regardless of data
+
+
+## Full Site-Integration
+
+### Jupyter Book Setup
+- [ ] Install JupyterBook dependency
+- [ ] 
+
+### Initial Document Structure
+- [ ] 
 
 ---
 
