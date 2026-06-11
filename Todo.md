@@ -32,26 +32,30 @@
 
 ---
 
-## Multi Encryption - Baseline
+## Multi Encryption - Baseline (`lib/notebook/pipeline.py`)
 
 ### Core Implementation
-- [ ] Implement `encrypt()` method to chain data through all layers sequentially
-- [ ] Implement `decrypt()` method (reverse layer order)
-- [ ] Handle intermediate data format between layers
+- [x] `MultiEncryption.encrypt()` chains data through enabled layers in order
+- [x] `decrypt()` unwinds in reverse layer order
+- [x] Intermediate format: raw bytes between layers; each layer keeps its own
+      auxiliary state (nonces, KEM ciphertexts) in its instance registry
+- [x] Pipelines quack like notebook-API algorithms — registerable in
+      ComposerSession for benchmarks and output quality analysis
 
 ### Key Propagation
-- [ ] Design key propagation strategy (shared key, per-layer keys, derived keys)
-- [ ] Implement key injection per layer (leverage KeyProvider pattern)
+- [x] Per-layer keys: each layer manages its own KeyProvider/keypair
+- [ ] Derived-key propagation (single master secret, per-layer HKDF) —
+      revisit alongside the HKDF KeyProvider task
 
 ### Layer Management
-- [ ] Add layer ordering/priority support
-- [ ] Add ability to remove/reorder layers after construction
-- [ ] Consider layer enable/disable toggling for A/B testing
+- [x] Ordered layers with `move_layer(name, position)`
+- [x] `add_layer` / `remove_layer` after construction
+- [x] `enable()` / `disable()` toggling for A/B testing
 
 ### Metrics
-- [ ] Add per-layer timing metrics
-- [ ] Add aggregate metrics across all layers
-- [ ] Create layered report structure showing each algorithm's contribution
+- [x] Per-layer timing, byte counts, expansion ratios
+- [x] Aggregate elapsed/expansion across the pipeline
+- [x] `ReportBuilder.layers_table()` — each layer's contribution + time share
 
 ---
 

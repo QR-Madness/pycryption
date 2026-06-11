@@ -451,6 +451,54 @@ class ReportBuilder:
             ]
             self.table(data, columns=["algorithm", "status"], title=title)
 
+    def layers_table(
+        self,
+        result: Any,
+        title: str = "Layer Contributions",
+    ) -> None:
+        """
+        Render per-layer metrics from a MultiEncryption result.
+
+        Args:
+            result: AlgorithmResult from pipeline encrypt()/decrypt(),
+                or its metrics dict
+            title: Table title
+        """
+        metrics = result if isinstance(result, dict) else result.metrics
+        layers = metrics.get("layers", [])
+        if not layers:
+            print("(no layer data)")
+            return
+
+        rows = []
+        total_ms = 0.0
+        for entry in layers:
+            total_ms += entry.get("elapsed_ms", 0)
+            rows.append({
+                "layer": entry["layer"],
+                "elapsed_ms": entry.get("elapsed_ms", 0),
+                "input_bytes": entry.get("input_bytes", 0),
+                "output_bytes": entry.get("output_bytes", 0),
+                "expansion_ratio": entry.get("expansion_ratio", "-"),
+            })
+        for row in rows:
+            share = (row["elapsed_ms"] / total_ms * 100) if total_ms else 0
+            row["time_share"] = f"{share:.1f}%"
+
+        self.table(
+            rows,
+            columns=["layer", "elapsed_ms", "time_share", "input_bytes", "output_bytes", "expansion_ratio"],
+            title=f"{title} ({metrics.get('operation', '?')}, {metrics.get('elapsed_ms', '?')} ms total)",
+            column_labels={
+                "layer": "Layer",
+                "elapsed_ms": "Elapsed (ms)",
+                "time_share": "Time Share",
+                "input_bytes": "In (B)",
+                "output_bytes": "Out (B)",
+                "expansion_ratio": "Expansion",
+            },
+        )
+
     def analysis_table(
         self,
         results: Dict[str, Dict[str, Any]],

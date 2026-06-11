@@ -20,7 +20,7 @@ from lib.algorithms import (
     ChaCha20Poly1305Algorithm,
     MlKem768HybridAlgorithm,
 )
-from lib.notebook import ComposerSession, ReportBuilder, adapt
+from lib.notebook import ComposerSession, MultiEncryption, ReportBuilder, adapt
 
 
 def main() -> int:
@@ -63,6 +63,12 @@ def main() -> int:
     session.register(
         adapt(MlKem768HybridAlgorithm, name="ML-KEM-768+AES-GCM", profile_memory=True)
     )
+
+    # Layered specimen: classical AEAD wrapped in the post-quantum hybrid
+    pipeline = MultiEncryption(name="PQ-Wrap[AES->ML-KEM]")
+    pipeline.add_layer(adapt(Aes256GcmAlgorithm, key, name="AES-256-GCM"))
+    pipeline.add_layer(adapt(MlKem768HybridAlgorithm, name="ML-KEM-768"))
+    session.register(pipeline)
 
     report.heading("Round-trip Tests", level=2)
     results = session.test_all()

@@ -51,6 +51,9 @@ from lib.notebook.analysis import (
     shannon_entropy,
 )
 
+# Multi Encryption pipeline
+from lib.notebook.pipeline import MultiEncryption
+
 # Benchmark persistence
 from lib.notebook.persistence import (
     compare_runs,
@@ -91,6 +94,8 @@ __all__ = [
     # Composer
     "ComposerSession",
     "AlgorithmMetrics",
+    # Multi Encryption pipeline
+    "MultiEncryption",
     # Key providers
     "KeyProvider",
     "LocalKeyProvider",

@@ -40,10 +40,17 @@ Tests ensure all components work and are traceable in failures. Given the sensit
 
 ### Core Components
 
-- **`lib/EncryptionAlgorithm.py`**: Base class and Input/Output types for all algorithms. Defines `SIMPLE_COMPOSER_TYPE` and `MULTI_COMPOSER_TYPE` constants.
-- **`lib/algorithms/`**: Production-ready algorithm implementations (e.g., `Aes256GcmAlgorithm`)
+- **`lib/EncryptionAlgorithm.py`**: Base class, Input/Output types, and `AlgorithmAdapter` for all algorithms
+- **`lib/algorithms/`**: Production-ready implementations (`Aes256GcmAlgorithm`, `ChaCha20Poly1305Algorithm`, `MlKem768HybridAlgorithm`)
 - **`lib/notebook/`**: Declarative API for rapid prototyping in Jupyter notebooks
+- **`lib/notebook/pipeline.py`**: `MultiEncryption` — layered pipelines (encrypt forward, decrypt reverse, per-layer metrics); pipelines register in ComposerSession like any algorithm
+- **`lib/notebook/analysis.py`**: Output quality analysis (entropy, chi-squared, avalanche, ECB canary) via `ComposerSession.analyze_all()`
+- **`lib/notebook/persistence.py`**: Benchmark runs persisted to `benchmarks/` as commit/machine-stamped JSON
 - **`lib/util/kms/`**: Key management via KeyProvider pattern
+
+### Lab Ops
+
+Day-to-day operations run through go-task (`Taskfile.yml`): `task test`, `task ride` (terminal benchmarks), `task analyze`, `task bench:save|list|diff`, `task nb:exec|nb:check` (headless notebook execution), `task site:build|site:preview` (Quarto site), `task security` (Snyk dependency scan via uv export).
 
 ### Two Pathways for Algorithm Creation
 
@@ -145,4 +152,4 @@ algo = adapt(Aes256GcmAlgorithm, key, name="AES-256-GCM", profile_memory=True)
 
 ## Security
 
-Run Snyk security scans on new first-party code. Fix any issues found, rescan, and repeat until clean before committing.
+Run Snyk security scans on new first-party code. Fix any issues found, rescan, and repeat until clean before committing. Use `task security` for dependency scans (Snyk lacks native uv support; the task exports the lockfile to pip format first). Snyk Code (SAST) requires enabling in the Snyk web console for the org.
