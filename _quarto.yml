@@ -1,0 +1,49 @@
+project:
+  type: website
+  output-dir: _site
+  render:
+    - index.qmd
+    - "General Cryptography.ipynb"
+    - "Encryption Composer.ipynb"
+    - Symmetric.ipynb
+    - Asymmetric.ipynb
+    - ML-KEM.ipynb
+
+website:
+  title: "PyCryption Lab"
+  description: "An encryption research lab — specimens, composers, and benchmarks."
+  navbar:
+    left:
+      - href: index.qmd
+        text: Front Desk
+      - href: "General Cryptography.ipynb"
+        text: On-Ramp
+      - href: "Encryption Composer.ipynb"
+        text: Composer Tutorial
+      - text: Specimens
+        menu:
+          - href: Symmetric.ipynb
+            text: Symmetric
+          - href: Asymmetric.ipynb
+            text: Asymmetric
+          - href: ML-KEM.ipynb
+            text: ML-KEM (Post-Quantum)
+    right:
+      - icon: github
+        href: https://github.com/QR-Madness/pycryption
+  page-footer:
+    center: "PyCryption — an evolving encryption research lab"
+
+format:
+  html:
+    theme:
+      light: flatly
+      dark: darkly
+    toc: true
+    code-copy: true
+    code-overflow: wrap
+
+# Notebooks are rendered from their committed outputs — never executed by
+# the site build. Refresh outputs deliberately via `task nb:exec`.
+execute:
+  enabled: false

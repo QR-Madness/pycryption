@@ -1,0 +1,43 @@
+---
+title: "PyCryption Lab"
+subtitle: "Specimens, composers, and benchmarks for encryption research"
+toc: false
+---
+
+Welcome to the front desk. PyCryption is an encryption research lab built
+around **composers** — harnesses that wrap encryption algorithms with
+automatic metrics collection, so testing an idea costs minutes instead of an
+afternoon of scaffolding.
+
+## The Wings
+
+| Wing | What's inside |
+|---|---|
+| [On-Ramp](General%20Cryptography.ipynb) | Cryptography fundamentals, level by level — from XOR to KEMs |
+| [Composer Tutorial](Encryption%20Composer.ipynb) | Build, test, and benchmark a prototype algorithm against production AEADs |
+| [Symmetric](Symmetric.ipynb) | Symmetric cipher benchmarks at scale |
+| [Asymmetric](Asymmetric.ipynb) | Asymmetric primitives (in progress) |
+| [ML-KEM](ML-KEM.ipynb) | Post-quantum hybrid encryption — ML-KEM-768 + AES-256-GCM (FIPS 203) |
+
+## The Specimen Shelf
+
+Production-grade implementations in `lib/algorithms`, all rideable through
+the composer:
+
+- **AES-256-GCM** — the block-cipher AEAD workhorse
+- **ChaCha20-Poly1305** — RFC 8439 stream AEAD, Salsa20's modern descendant
+- **ML-KEM-768 + AES-256-GCM** — post-quantum KEM-DEM hybrid
+
+## Running the Lab
+
+```bash
+uv sync         # install dependencies
+task            # list all lab operations
+task test       # full test suite
+task ride       # benchmark the specimen shelf in your terminal
+```
+
+Every result table on this site comes from committed notebook outputs —
+the site build never executes code. Outputs are refreshed deliberately with
+`task nb:exec`, so benchmarks are reviewable in git history like any other
+change.

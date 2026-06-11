@@ -31,3 +31,8 @@ Thumbs.db
 .vscode/
 .idea/
 *.iml
+
+# Quarto site build artifacts
+/.quarto/
+/_site/
+**/*.quarto_ipynb

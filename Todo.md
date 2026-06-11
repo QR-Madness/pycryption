@@ -103,23 +103,27 @@ Goal: serve the notebooks as a crisp, low-maintenance site, with room for
 rich notebooks, exercises, and a cryptography on-ramp mathematics track.
 
 ### Stack Decision
-- [ ] Pin the stack — **Quarto recommended**: renders committed `.ipynb`
-      outputs without re-executing (friendliest to our outputs-in-git
-      convention), single binary + one `_quarto.yml`, native KaTeX for the
-      math track, ANSI-aware output rendering for `rich` tables
-- [ ] Runner-up: MyST/Jupyter Book 2 (exercise/proof directives are strong
-      for course content) — revisit if Quarto theming disappoints
-- [ ] Next.js/Vite assessment: notebooks become second-class (own the
-      ipynb→MDX pipeline, ANSI, math, highlighting); only worth it if the
-      site becomes a product. Keep notebooks canonical so migration stays
-      possible later.
+- [x] Pin the stack — **Quarto** (v1.9.38, user-local install): renders
+      committed `.ipynb` outputs without re-executing (friendliest to our
+      outputs-in-git convention), single binary + one `_quarto.yml`,
+      native KaTeX for the math track; rich tables render as styled HTML
+      `<pre>` blocks with no extra plumbing
+- ~~Runner-up: MyST/Jupyter Book 2~~ — revisit only if Quarto theming
+  disappoints
+- ~~Next.js/Vite~~ — notebooks become second-class (own the ipynb→MDX
+  pipeline, ANSI, math, highlighting); only worth it if the site becomes a
+  product. Notebooks stay canonical so migration remains possible.
 
-### Candidate A — Root Project (start here)
-- [ ] `_quarto.yml` at repo root; notebooks stay where they are, listed as
+### Candidate A — Root Project (LIVE)
+- [x] `_quarto.yml` at repo root; notebooks stay where they are, listed as
       render targets — zero import breakage, minimal churn
-- [ ] Index page: lab overview + latest specimen comparison
-- [ ] Theme pass: dark/light, output styling; use ReportBuilder HTML mode
-      where rich-table ANSI renders poorly
+- [x] Index page (`index.qmd`): front desk with wings, specimen shelf, lab ops
+- [x] Build/preview wired: `task site:build`, `task site:preview`
+- [ ] Theme pass: rich emits inline colors assuming dark background —
+      silver (#c0c0c0) text is low-contrast on the light theme; either
+      default to dark, override via CSS, or use ReportBuilder HTML mode
+- [ ] Title/heading audit: each notebook's first markdown cell becomes its
+      page title — make them consistent
 
 ### Candidate B — Lab Wings (graduate when on-ramp content lands)
 - [ ] Reorganize content into `specimens/`, `composer/`, `on-ramp/`,
