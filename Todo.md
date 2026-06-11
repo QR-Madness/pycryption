@@ -119,9 +119,10 @@ rich notebooks, exercises, and a cryptography on-ramp mathematics track.
       render targets — zero import breakage, minimal churn
 - [x] Index page (`index.qmd`): front desk with wings, specimen shelf, lab ops
 - [x] Build/preview wired: `task site:build`, `task site:preview`
-- [ ] Theme pass: rich emits inline colors assuming dark background —
-      silver (#c0c0c0) text is low-contrast on the light theme; either
-      default to dark, override via CSS, or use ReportBuilder HTML mode
+- [x] Theme pass (`assets/lab.css`): cell outputs render on a terminal-style
+      dark panel in both themes, so rich's ANSI palette stays legible; ANSI
+      navy lifted for contrast; navbar logo + favicon derived from
+      PyCryption.png into `assets/` (trimmed, 104K/8K vs the 2.3M original)
 - [ ] Title/heading audit: each notebook's first markdown cell becomes its
       page title — make them consistent
 

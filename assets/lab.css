@@ -1,0 +1,31 @@
+/* PyCryption Lab theme pass.
+ *
+ * rich emits inline ANSI palette colors assuming a dark terminal, so cell
+ * outputs get a terminal-style dark panel in BOTH themes — benchmark tables
+ * stay legible on the light theme without per-color overrides. */
+
+.cell-output pre {
+  background-color: #16191d;
+  color: #e6e6e6;
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  border: 1px solid #2c3138;
+}
+
+/* The ANSI navy (#000080) rich uses for table borders is too dim on the
+ * dark panel — lift it. */
+.cell-output pre span[style*="color: #000080"] {
+  color: #5b9bd5 !important;
+}
+
+/* Slightly tighten the navbar logo */
+.navbar-brand img {
+  max-height: 36px;
+  width: auto;
+}
+
+/* Keep markdown tables from feeling cramped next to the terminal panels */
+table.table {
+  margin-top: 0.5rem;
+  margin-bottom: 1.25rem;
+}
