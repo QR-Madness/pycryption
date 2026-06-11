@@ -78,6 +78,15 @@ tasks:
     cmds:
       - quarto render
 
+  security:
+    desc: Snyk dependency scan (exports uv lock to pip format first)
+    preconditions:
+      - sh: command -v snyk
+        msg: "snyk CLI not installed"
+    cmds:
+      - uv export --format requirements-txt --no-hashes -o /tmp/pycryption-requirements.txt
+      - snyk test --file=/tmp/pycryption-requirements.txt --package-manager=pip --command={{.PY}}
+
   clean:
     desc: Remove caches and build artifacts
     cmds:
