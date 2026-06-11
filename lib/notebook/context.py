@@ -129,11 +129,11 @@ class CryptoRegistry:
     # --- Encapsulation (for PQ/KEM algorithms) ---
     
     def set_encapsulator(self, name: str, func: EncapsulateFunction) -> None:
-        """Register an encapsulation function (e.g., Kyber encaps)."""
+        """Register an encapsulation function (e.g., ML-KEM encaps)."""
         self.encapsulators[name] = func
     
     def set_decapsulator(self, name: str, func: DecapsulateFunction) -> None:
-        """Register a decapsulation function (e.g., Kyber decaps)."""
+        """Register a decapsulation function (e.g., ML-KEM decaps)."""
         self.decapsulators[name] = func
     
     def encapsulate(self, name: str, public_key: bytes, cache_as: Optional[str] = None) -> tuple[bytes, bytes]:

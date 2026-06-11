@@ -36,7 +36,7 @@ jupyter notebook
 
 - `Symmetric.ipynb` - Symmetric encryption benchmarks
 - `Asymmetric.ipynb` - Asymmetric encryption examples
-- `KYBER.ipynb` - Post-quantum key encapsulation
+- `ML-KEM.ipynb` - Post-quantum hybrid encryption (ML-KEM-768 + AES-256-GCM, FIPS 203)
 - `Encryption Composer.ipynb` - Composer usage examples
 
 ## Requirements

@@ -25,7 +25,7 @@ _STATE_KEY = "__adapter_state"
 
 def adapt(
     algo_class: Type[EncryptionAlgorithm],
-    key: Union[bytes, KeyProvider],
+    key: Optional[Union[bytes, KeyProvider]] = None,
     name: Optional[str] = None,
     *,
     adapter: Optional[AlgorithmAdapter] = None,
@@ -42,7 +42,8 @@ def adapt(
 
     Args:
         algo_class: The EncryptionAlgorithm subclass (e.g., Aes256GcmAlgorithm)
-        key: Raw key bytes or a KeyProvider instance
+        key: Raw key bytes or a KeyProvider instance. Omit for keypair-based
+            algorithms (e.g., KEM hybrids) that manage their own key material.
         name: Algorithm name for registration (defaults to class name)
         adapter: Optional adapter override. If not provided, calls algo_class.adapter().
         profile_memory: Enable memory profiling via tracemalloc.
@@ -64,9 +65,11 @@ def adapt(
             )
         adapter = algo_class.adapter()
 
-    # Resolve key provider
-    key_provider: KeyProvider
-    if isinstance(key, KeyProvider):
+    # Resolve key provider (None for keypair-based algorithms)
+    key_provider: Optional[KeyProvider]
+    if key is None:
+        key_provider = None
+    elif isinstance(key, KeyProvider):
         key_provider = key
     else:
         key_provider = LocalKeyProvider(key)
@@ -76,7 +79,8 @@ def adapt(
 
     # Instantiate the inner algorithm with key provider
     inner = algo_class()
-    inner._key_provider = key_provider  # type: ignore[attr-defined]
+    if key_provider is not None:
+        inner._key_provider = key_provider  # type: ignore[attr-defined]
 
     # Capture in closure
     _adapter = adapter
@@ -104,7 +108,8 @@ def adapt(
         AdaptedAlgorithm = with_metrics()(AdaptedAlgorithm)
     if profile_memory:
         AdaptedAlgorithm = with_memory_profiling()(AdaptedAlgorithm)
-    AdaptedAlgorithm = with_key(key_provider)(AdaptedAlgorithm)
+    if key_provider is not None:
+        AdaptedAlgorithm = with_key(key_provider)(AdaptedAlgorithm)
     AdaptedAlgorithm = algorithm(algo_name)(AdaptedAlgorithm)
 
     AdaptedAlgorithm.__name__ = f"Adapted{algo_class.__name__}"

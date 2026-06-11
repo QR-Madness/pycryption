@@ -4,6 +4,8 @@
 
 ### Algorithm Implementation
 - [x] Implement a concrete symmetric algorithm (e.g., AES-256-GCM) extending `EncryptionAlgorithm`
+- [x] Implement ChaCha20-Poly1305 (RFC 8439) as a second production AEAD
+- [x] Implement ML-KEM-768 + AES-256-GCM hybrid (post-quantum KEM-DEM, FIPS 203)
 - [ ] Implement a concrete asymmetric algorithm (e.g., RSA or ECDH) for key exchange demos
 
 ### Input/Output Classes

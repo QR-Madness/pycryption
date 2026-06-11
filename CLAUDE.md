@@ -122,7 +122,7 @@ Declarative API for rapid algorithm prototyping in Jupyter notebooks.
 - `ctx.set_nonce(name)` / `ctx.get_nonce(name)` — Nonce management via registry
 - `ctx.set_salt(name)` / `ctx.get_salt(name)` — Salt management via registry
 
-**CryptoRegistry** (`context.py`) is the single source of truth for all cryptographic materials. It persists across encrypt/decrypt calls on an instance and stores: keys, salts, nonces, derived keys, shared secrets, KDF functions, and encapsulation/decapsulation functions (for PQ/KEM algorithms like Kyber).
+**CryptoRegistry** (`context.py`) is the single source of truth for all cryptographic materials. It persists across encrypt/decrypt calls on an instance and stores: keys, salts, nonces, derived keys, shared secrets, KDF functions, and encapsulation/decapsulation functions (for PQ/KEM algorithms like ML-KEM, formerly Kyber).
 
 **ComposerSession** (`composer.py`) for benchmarking prototypes against production algorithms:
 - `register()` — Register algorithm instances
