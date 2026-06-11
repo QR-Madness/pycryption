@@ -5,6 +5,10 @@ version: '3'
 vars:
   PY: .venv/bin/python
 
+env:
+  # benchmarks.qmd executes at site build (reads persisted JSON only)
+  QUARTO_PYTHON: .venv/bin/python
+
 tasks:
   default:
     desc: List all lab tasks

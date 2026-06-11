@@ -11,22 +11,49 @@ afternoon of scaffolding.
 
 ## The Wings
 
-| Wing | What's inside |
-|---|---|
-| [On-Ramp](General%20Cryptography.ipynb) | Cryptography fundamentals, level by level — from XOR to KEMs |
-| [Composer Tutorial](Encryption%20Composer.ipynb) | Build, test, and benchmark a prototype algorithm against production AEADs |
-| [Symmetric](Symmetric.ipynb) | Symmetric cipher benchmarks at scale |
-| [Asymmetric](Asymmetric.ipynb) | Asymmetric primitives (in progress) |
-| [ML-KEM](ML-KEM.ipynb) | Post-quantum hybrid encryption — ML-KEM-768 + AES-256-GCM (FIPS 203) |
+:::: {.grid}
+
+::: {.g-col-12 .g-col-md-6 .wing-card}
+### {{< fa road >}} [On-Ramp](General%20Cryptography.ipynb)
+Cryptography fundamentals, level by level — from XOR to KEMs. The
+mathematics track and exercises will grow here.
+:::
+
+::: {.g-col-12 .g-col-md-6 .wing-card}
+### {{< fa flask >}} [Composer Tutorial](Encryption%20Composer.ipynb)
+Build, test, and benchmark a prototype algorithm against production AEADs
+in a few decorated lines.
+:::
+
+::: {.g-col-12 .g-col-md-6 .wing-card}
+### {{< fa shield-halved >}} [ML-KEM (Post-Quantum)](ML-KEM.ipynb)
+ML-KEM-768 + AES-256-GCM hybrid (FIPS 203) — sender/recipient roles and
+what the per-message KEM tax actually costs.
+:::
+
+::: {.g-col-12 .g-col-md-6 .wing-card}
+### {{< fa chart-line >}} [Benchmarks](benchmarks.qmd)
+Longitudinal, commit-stamped measurements — seeded payloads, machine
+fingerprints, and throughput trends across runs.
+:::
+
+::::
 
 ## The Specimen Shelf
 
 Production-grade implementations in `lib/algorithms`, all rideable through
 the composer:
 
-- **AES-256-GCM** — the block-cipher AEAD workhorse
-- **ChaCha20-Poly1305** — RFC 8439 stream AEAD, Salsa20's modern descendant
-- **ML-KEM-768 + AES-256-GCM** — post-quantum KEM-DEM hybrid
+| Specimen | Class | Notes |
+|---|---|---|
+| **AES-256-GCM** | block-cipher AEAD | the workhorse |
+| **ChaCha20-Poly1305** | stream AEAD (RFC 8439) | Salsa20's modern descendant |
+| **ML-KEM-768 + AES-256-GCM** | post-quantum KEM-DEM | fresh encapsulation per message |
+| **PQ-Wrap [AES → ML-KEM]** | layered pipeline | classical + PQ defense in depth |
+
+Layering is first-class: `MultiEncryption` chains any algorithms and reports
+each layer's cost, and a pipeline registers in a `ComposerSession` like any
+single specimen — benchmarks, quality analysis, and all.
 
 ## Running the Lab
 
@@ -35,9 +62,11 @@ uv sync         # install dependencies
 task            # list all lab operations
 task test       # full test suite
 task ride       # benchmark the specimen shelf in your terminal
+task analyze    # output quality panel: entropy, avalanche, ECB canary
+task bench:save # persist a seeded, commit-stamped benchmark run
 ```
 
-Every result table on this site comes from committed notebook outputs —
-the site build never executes code. Outputs are refreshed deliberately with
-`task nb:exec`, so benchmarks are reviewable in git history like any other
-change.
+Every result table on this site comes from committed notebook outputs or
+persisted benchmark records — the site build never executes crypto. Outputs
+refresh deliberately via `task nb:exec`, so benchmarks are reviewable in git
+history like any other change.

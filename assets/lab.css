@@ -5,11 +5,11 @@
  * stay legible on the light theme without per-color overrides. */
 
 .cell-output pre {
-  background-color: #16191d;
+  background-color: #0b0f14;
   color: #e6e6e6;
-  border-radius: 6px;
+  border-radius: 8px;
   padding: 0.75rem 1rem;
-  border: 1px solid #2c3138;
+  border: 1px solid #30363d;
 }
 
 /* The ANSI navy (#000080) rich uses for table borders is too dim on the

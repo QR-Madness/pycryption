@@ -1,0 +1,119 @@
+---
+title: "Benchmarks"
+subtitle: "Longitudinal measurements from persisted lab records"
+execute:
+  enabled: true
+  echo: false
+---
+
+Every table on this page is rendered from the commit-stamped JSON records in
+[`benchmarks/`](https://github.com/QR-Madness/pycryption/tree/master/benchmarks)
+— saved deliberately with `task bench:save`, never re-measured at site build.
+Payloads are seeded, so numbers are comparable across runs; machine and commit
+context travels with every record.
+
+```{python}
+from IPython.display import Markdown, display
+
+from lib.notebook import load_runs
+
+runs = load_runs()
+if not runs:
+    display(Markdown("_No saved runs yet — `task bench:save` creates the first record._"))
+```
+
+```{python}
+def md(text):
+    display(Markdown(text))
+
+if runs:
+    latest = runs[-1]
+    git = latest["git"]
+    machine = latest["machine"]
+    commit = (git["commit"] or "?") + ("-dirty" if git["dirty"] else "")
+    md(f"""
+## Latest Run
+
+| | |
+|---|---|
+| **Saved** | {latest["saved_at"]} |
+| **Commit** | `{commit}` |
+| **Machine** | {machine["hostname"]} ({machine["machine"]}, {machine["cpu_count"]} cores) |
+| **Python** | {machine["python"]} |
+| **Seed** | `{latest["seed"]}` |
+| **Iterations** | {latest["iterations"]} |
+""")
+```
+
+```{python}
+if runs:
+    import pandas as pd
+
+    rows = []
+    for algo, result in runs[-1]["benchmarks"].items():
+        for entry in result["benchmarks"]:
+            rows.append({
+                "Algorithm": algo,
+                "Size (B)": f'{entry["size_bytes"]:,}',
+                "Encrypt (ms)": entry["avg_encrypt_ms"],
+                "Decrypt (ms)": entry["avg_decrypt_ms"],
+                "Throughput (MB/s)": entry["throughput_mbps"],
+                "P99 Encrypt (ms)": entry.get("p99_encrypt_ms", "-"),
+            })
+    md("### Results by Size")
+    display(pd.DataFrame(rows))
+```
+
+```{python}
+if runs and "analysis" in runs[-1]:
+    rows = []
+    for algo, panel in runs[-1]["analysis"].items():
+        if "error" in panel:
+            continue
+        rows.append({
+            "Algorithm": algo,
+            "Entropy (bits/B)": panel["entropy_bits_per_byte"],
+            "χ²": panel["chi2_statistic"],
+            "Avalanche %": panel["avalanche_pct"],
+            "ECB Dups": panel["ecb_duplicate_blocks"],
+            "Verdict": "✅ CLEAN" if not panel["flags"] else "⚠️ " + ", ".join(panel["flags"]),
+        })
+    if rows:
+        md("## Output Quality Panel")
+        md("From the same saved run — entropy, byte uniformity, avalanche, and the ECB canary.")
+        display(pd.DataFrame(rows))
+```
+
+```{python}
+if len(runs) >= 2:
+    from lib.notebook import compare_runs
+
+    old, new = runs[-2], runs[-1]
+    delta_rows = compare_runs(old, new)
+    if delta_rows:
+        md(f"""
+## Trend vs Previous Run
+
+`{old["git"]["commit"]}` ({old["saved_at"]}) → `{new["git"]["commit"]}` ({new["saved_at"]})
+""")
+        display(pd.DataFrame([{
+            "Algorithm": r["algorithm"],
+            "Size (B)": f'{r["size_bytes"]:,}',
+            "Old (MB/s)": r["old_throughput_mbps"],
+            "New (MB/s)": r["new_throughput_mbps"],
+            "Δ %": r["delta_pct"],
+        } for r in delta_rows]))
+```
+
+```{python}
+if runs:
+    md("## Run History")
+    import pandas as pd
+    display(pd.DataFrame([{
+        "Saved": r["saved_at"],
+        "Commit": (r["git"]["commit"] or "?") + ("-dirty" if r["git"]["dirty"] else ""),
+        "Host": r["machine"]["hostname"],
+        "Label": r.get("label") or "—",
+        "Algorithms": len(r.get("benchmarks", {})),
+    } for r in runs]))
+```

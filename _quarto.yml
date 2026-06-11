@@ -3,6 +3,7 @@ project:
   output-dir: _site
   render:
     - index.qmd
+    - benchmarks.qmd
     - "General Cryptography.ipynb"
     - "Encryption Composer.ipynb"
     - Symmetric.ipynb
@@ -13,6 +14,8 @@ website:
   title: "PyCryption Lab"
   description: "An encryption research lab — specimens, composers, and benchmarks."
   favicon: assets/favicon.png
+  page-navigation: true
+  back-to-top-navigation: true
   navbar:
     logo: assets/logo.png
     left:
@@ -30,6 +33,8 @@ website:
             text: Asymmetric
           - href: ML-KEM.ipynb
             text: ML-KEM (Post-Quantum)
+      - href: benchmarks.qmd
+        text: Benchmarks
     right:
       - icon: github
         href: https://github.com/QR-Madness/pycryption
@@ -38,15 +43,24 @@ website:
 
 format:
   html:
+    # dark listed first = site default; toggle persists per visitor
     theme:
-      light: flatly
-      dark: darkly
+      dark: [darkly, assets/theme-dark.scss]
+      light: [flatly, assets/theme-light.scss]
     css: assets/lab.css
     toc: true
+    toc-depth: 3
     code-copy: true
     code-overflow: wrap
+    highlight-style: a11y
+    smooth-scroll: true
+    anchor-sections: true
+    lightbox: true
+    grid:
+      body-width: 850px
 
 # Notebooks are rendered from their committed outputs — never executed by
-# the site build. Refresh outputs deliberately via `task nb:exec`.
+# the site build. (benchmarks.qmd opts back in per-page: it only READS
+# persisted benchmark records, it never re-measures.)
 execute:
   enabled: false

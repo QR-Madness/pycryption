@@ -134,6 +134,13 @@ rich notebooks, exercises, and a cryptography on-ramp mathematics track.
       render targets — zero import breakage, minimal churn
 - [x] Index page (`index.qmd`): front desk with wings, specimen shelf, lab ops
 - [x] Build/preview wired: `task site:build`, `task site:preview`
+- [x] Modern theme pass 2: dark default (light toggle persists), custom
+      SCSS pair on GitHub-dark/light palettes, Inter + JetBrains Mono,
+      wing-card grid on the front desk, fontawesome extension, smooth
+      scroll / page-nav / back-to-top / lightbox
+- [x] Vercel-ready: `vercel.json` + idempotent `scripts/build-site.sh`
+      (installs Quarto + uv when missing, `uv sync --frozen`, renders);
+      connect the repo and Vercel picks it up — output dir `_site`
 - [x] Theme pass (`assets/lab.css`): cell outputs render on a terminal-style
       dark panel in both themes, so rich's ANSI palette stays legible; ANSI
       navy lifted for contrast; navbar logo + favicon derived from
@@ -170,8 +177,10 @@ rich notebooks, exercises, and a cryptography on-ramp mathematics track.
       records in `benchmarks/` (commit + dirty flag, machine fingerprint,
       UTC timestamp, seed, optional analysis panel); `task bench:save`,
       `task bench:list`, `task bench:diff` (throughput deltas between runs)
-- [ ] Surface saved runs on the site (benchmarks page fed from
-      `benchmarks/*.json`)
+- [x] Surface saved runs on the site: `benchmarks.qmd` renders latest run,
+      output quality panel, trend vs previous run, and run history from
+      `benchmarks/*.json` (page-level execute override — reads records
+      only, never re-measures)
 
 ---
 
